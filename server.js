@@ -108,5 +108,9 @@ ongo дотор яг 6 өнгө, outfit дотор 2-3, shopping болон delg
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`MyStyle сервер аслаа: http://localhost:${PORT}`));
+if (process.env.VERCEL !== '1') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`MyStyle сервер аслаа: http://localhost:${PORT}`));
+}
+
+module.exports = app;
