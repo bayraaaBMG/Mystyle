@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyStyle AI — Өөртөө тохирох хувцас, өнгө, үсээ мэд</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Spectral:ital,wght@0,600;0,800;1,600;1,800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EEE7D9; --paper:#FBF7EE; --ink:#221F1A; --muted:#6E6557;
+    --line:#D9CFBC; --accent:#B5482B; --accent-dark:#8F3318; --gold:#9A7B3F;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Manrope',system-ui,sans-serif;background:radial-gradient(120% 80% at 80% -10%, rgba(181,72,43,.10), transparent 60%),var(--bg);color:var(--ink);min-height:100vh;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .serif{font-family:'Spectral',Georgia,serif}
+  .wrap{max-width:760px;margin:0 auto;padding:0 24px}
+
+  .hero{padding:72px 0 40px;text-align:center}
+  .eyebrow{font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:var(--accent-dark);font-weight:700;margin-bottom:22px}
+  .hero h1{font-family:'Spectral',serif;font-weight:800;font-size:clamp(38px,7vw,64px);line-height:1.02;letter-spacing:-.01em;margin-bottom:20px}
+  .hero h1 em{font-style:italic;color:var(--accent)}
+  .lede{font-size:18px;color:var(--muted);max-width:520px;margin:0 auto 34px}
+  .cta{appearance:none;border:none;cursor:pointer;background:var(--ink);color:var(--paper);font-family:'Manrope';font-weight:700;font-size:15px;letter-spacing:.02em;padding:15px 34px;border-radius:100px;transition:transform .18s,background .18s}
+  .cta:hover{background:var(--accent-dark);transform:translateY(-2px)}
+  .demo-tag{display:inline-block;margin-top:18px;font-size:12px;color:var(--muted);letter-spacing:.04em}
+  .rule{height:1px;background:var(--line);margin:8px 0}
+
+  .quiz{padding:18px 0 60px}
+  .quiz h2{font-family:'Spectral',serif;font-style:italic;font-weight:600;font-size:30px;text-align:center;margin-bottom:6px}
+  .quiz .sub{text-align:center;color:var(--muted);margin-bottom:34px;font-size:15px}
+  .field{margin-bottom:26px}
+  .field>label{display:block;font-weight:700;font-size:14px;margin-bottom:12px}
+  .field .hint{font-weight:400;color:var(--muted);font-size:13px}
+  .opts{display:flex;flex-wrap:wrap;gap:9px}
+  .opt{border:1.5px solid var(--line);background:var(--paper);border-radius:100px;padding:9px 16px;font-size:14px;cursor:pointer;transition:all .15s;user-select:none;color:var(--ink)}
+  .opt:hover{border-color:var(--accent)}
+  .opt.sel{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .row{display:flex;gap:16px;flex-wrap:wrap}
+  .row .field{flex:1;min-width:140px}
+  input[type=number]{width:100%;border:1.5px solid var(--line);background:var(--paper);border-radius:12px;padding:12px 14px;font-size:15px;font-family:'Manrope';color:var(--ink);outline:none;transition:border .15s}
+  input:focus{border-color:var(--accent)}
+
+  .upload{border:1.5px dashed var(--line);border-radius:14px;padding:22px;text-align:center;cursor:pointer;transition:all .15s;background:var(--paper);display:block}
+  .upload:hover{border-color:var(--accent);background:#fff}
+  .upload .u-ico{font-size:26px;margin-bottom:8px}
+  .upload .u-t{font-weight:700;font-size:14px;margin-bottom:4px}
+  .upload .u-s{font-size:12px;color:var(--muted)}
+  .upload input{display:none}
+  .preview{display:none;margin-top:12px;align-items:center;gap:12px}
+  .preview img{width:56px;height:56px;border-radius:12px;object-fit:cover;border:1px solid var(--line)}
+  .preview .rm{font-size:12px;color:var(--accent-dark);cursor:pointer;text-decoration:underline}
+
+  .generate{width:100%;margin-top:10px;appearance:none;border:none;cursor:pointer;background:var(--accent);color:#fff;font-family:'Manrope';font-weight:800;font-size:16px;padding:17px;border-radius:14px;letter-spacing:.02em;transition:background .18s,transform .15s}
+  .generate:hover{background:var(--accent-dark);transform:translateY(-1px)}
+  .generate:disabled{opacity:.55;cursor:wait;transform:none}
+  .err{color:var(--accent-dark);font-size:14px;margin-top:14px;text-align:center;display:none}
+
+  .result{display:none;padding:10px 0 80px;animation:fade .5s}
+  @keyframes fade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .report{background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:38px 34px;box-shadow:0 24px 50px -30px rgba(34,31,26,.4)}
+  .report .head{text-align:center;margin-bottom:30px}
+  .report .head .eyebrow{margin-bottom:14px}
+  .report .head h3{font-family:'Spectral',serif;font-weight:800;font-size:28px}
+  .sec{margin-bottom:30px}
+  .sec:last-child{margin-bottom:0}
+  .sec .stitle{display:flex;align-items:center;gap:10px;font-family:'Spectral',serif;font-style:italic;font-size:21px;font-weight:600;margin-bottom:14px}
+  .sec .stitle .n{font-family:'Manrope';font-style:normal;font-weight:800;font-size:11px;color:var(--accent);border:1.5px solid var(--accent);border-radius:100px;min-width:26px;height:26px;padding:0 5px;display:grid;place-items:center;flex:none}
+  .intro-text{font-size:16px}
+  .list{list-style:none}
+  .list li{position:relative;padding-left:20px;margin-bottom:9px;font-size:15px}
+  .list li::before{content:"";position:absolute;left:2px;top:10px;width:6px;height:6px;background:var(--accent);border-radius:50%}
+  .avoid li::before{background:var(--muted)}
+  .palette{display:flex;flex-wrap:wrap;gap:14px}
+  .sw{text-align:center;width:84px}
+  .sw .chip{height:62px;border-radius:12px;border:1px solid rgba(0,0,0,.08);margin-bottom:7px}
+  .sw .nm{font-size:12px;color:var(--muted);line-height:1.3}
+  .outfit{border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px}
+  .outfit .o-h{font-weight:800;font-size:14px;color:var(--accent-dark);margin-bottom:6px}
+  .outfit p{font-size:15px}
+  .today{background:linear-gradient(135deg,var(--ink),#3a342b);color:var(--paper);border-radius:16px;padding:20px 22px;margin-bottom:30px}
+  .today .t-h{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#d9bfa0;margin-bottom:8px;font-weight:700}
+  .today .t-w{font-family:'Spectral',serif;font-style:italic;font-size:17px;margin-bottom:8px}
+  .today p{font-size:15px;opacity:.95}
+  .premium{position:relative;border:1.5px solid var(--gold);border-radius:16px;padding:26px 24px;text-align:center;background:linear-gradient(180deg,#FBF6E9,#F5ECD6);margin-top:6px}
+  .premium .badge{display:inline-block;font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:800;color:var(--gold);border:1.5px solid var(--gold);border-radius:100px;padding:5px 14px;margin-bottom:14px}
+  .premium h4{font-family:'Spectral',serif;font-weight:800;font-size:22px;margin-bottom:8px}
+  .premium .p-d{font-size:14px;color:var(--muted);max-width:440px;margin:0 auto 16px}
+  .premium .p-list{list-style:none;text-align:left;max-width:360px;margin:0 auto 20px}
+  .premium .p-list li{padding-left:24px;position:relative;font-size:14px;margin-bottom:8px}
+  .premium .p-list li::before{content:"✓";position:absolute;left:0;color:var(--gold);font-weight:800}
+  .premium .p-btn{appearance:none;border:none;cursor:pointer;background:var(--gold);color:#fff;font-family:'Manrope';font-weight:800;font-size:15px;padding:14px 30px;border-radius:100px;transition:all .15s}
+  .premium .p-btn:hover{background:#85692f;transform:translateY(-1px)}
+  .premium .p-note{font-size:11px;color:var(--muted);margin-top:12px}
+  .actions{display:flex;gap:12px;justify-content:center;margin-top:26px;flex-wrap:wrap}
+  .btn-line{background:none;border:1.5px solid var(--ink);color:var(--ink);font-family:'Manrope';font-weight:700;font-size:14px;padding:12px 24px;border-radius:100px;cursor:pointer;transition:all .15s}
+  .btn-line:hover{background:var(--ink);color:var(--paper)}
+  .loader{text-align:center;padding:50px 0;display:none}
+  .spin{width:42px;height:42px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;margin:0 auto 18px;animation:rot 1s linear infinite}
+  @keyframes rot{to{transform:rotate(360deg)}}
+  .loader p{color:var(--muted);font-family:'Spectral',serif;font-style:italic;font-size:18px}
+  .foot{text-align:center;color:var(--muted);font-size:12px;padding:30px 0 50px;letter-spacing:.03em}
+  @media print{
+    body{background:#fff}
+    .hero,.quiz,.loader,.foot,.actions,.premium .p-btn,.premium .p-note{display:none!important}
+    .result{display:block!important;padding:0}
+    .report{box-shadow:none;border:none}
+  }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="eyebrow">MyStyle · AI Стилист</div>
+    <h1 class="serif">Өөртөө яг тохирох <em>хувцас, өнгө, үсээ</em> мэд</h1>
+    <p class="lede">Хэдхэн асуултад хариулаад, биеийн онцлогт тань тохирсон хувийн стилийн зөвлөгөөг минутын дотор аваарай.</p>
+    <button class="cta" id="start">Үнэгүй тестээ эхлүүлэх</button>
+    <div class="demo-tag">AI таны хариултад тулгуурлан зөвлөгөө гаргана</div>
+  </div>
+</section>
+
+<section class="quiz" id="quiz">
+  <div class="wrap">
+    <div class="rule"></div>
+    <h2 class="serif" style="margin-top:34px">Стилийн тест</h2>
+    <p class="sub">Аль болох үнэн зөв бөглөх тусам зөвлөгөө илүү тохирно.</p>
+
+    <div class="field"><label>Хүйс</label>
+      <div class="opts" data-q="gender"><div class="opt">Эмэгтэй</div><div class="opt">Эрэгтэй</div><div class="opt">Бусад</div></div></div>
+
+    <div class="row">
+      <div class="field"><label>Өндөр <span class="hint">(см)</span></label><input type="number" id="height" placeholder="жишээ нь: 170"></div>
+      <div class="field"><label>Жин <span class="hint">(кг — заавал биш)</span></label><input type="number" id="weight" placeholder="жишээ нь: 65"></div>
+    </div>
+
+    <div class="field"><label>Биеийн хэлбэр</label>
+      <div class="opts" data-q="body"><div class="opt">Алимтан (дээд хэсэг өргөн)</div><div class="opt">Лийртэн (доод хэсэг өргөн)</div><div class="opt">Цаг шиг (бэлхүүс нарийн)</div><div class="opt">Шулуун (тэгш)</div><div class="opt">Мэдэхгүй</div></div></div>
+
+    <div class="field"><label>Selfie зураг оруулах <span class="hint">(заавал биш — оруулбал AI нүүрний хэлбэр, өнгөлгийг өөрөө уншина)</span></label>
+      <label class="upload" id="uplabel"><div class="u-ico">📷</div><div class="u-t">Зураг сонгох</div><div class="u-s">Нүүр тод харагдсан зураг · JPG/PNG</div><input type="file" id="selfie" accept="image/*"></label>
+      <div class="preview" id="preview"><img id="pimg" alt=""><span class="rm" id="premove">Зураг устгах</span></div></div>
+
+    <div class="field"><label>Нүүрний хэлбэр <span class="hint">(зураг оруулбал алгасаж болно)</span></label>
+      <div class="opts" data-q="face"><div class="opt">Дугуй</div><div class="opt">Зууван</div><div class="opt">Дөрвөлжин</div><div class="opt">Зүрх хэлбэр</div><div class="opt">Сунгасан</div><div class="opt">Мэдэхгүй</div></div></div>
+
+    <div class="field"><label>Арьсны өнгөний онцлог</label>
+      <div class="opts" data-q="skin"><div class="opt">Цайвар</div><div class="opt">Дунд зэрэг</div><div class="opt">Бараан</div></div></div>
+
+    <div class="field"><label>Арьс/судасны өнгөлөг <span class="hint">(нарны гэрэлд судас цэнхэр бол хүйтэн, ногоон бол дулаан)</span></label>
+      <div class="opts" data-q="undertone"><div class="opt">Дулаан</div><div class="opt">Хүйтэн</div><div class="opt">Саармаг / Мэдэхгүй</div></div></div>
+
+    <div class="field"><label>Дуртай стиль</label>
+      <div class="opts" data-q="style"><div class="opt">Энгийн / Casual</div><div class="opt">Цэвэрхэн / Minimal</div><div class="opt">Албаны / Classic</div><div class="opt">Спорт</div><div class="opt">Зоригтой / Trendy</div></div></div>
+
+    <div class="field"><label>Зөвлөгөө ямар нөхцөлд хэрэгтэй вэ?</label>
+      <div class="opts" data-q="occasion"><div class="opt">Өдөр тутам</div><div class="opt">Ажил</div><div class="opt">Ярилцлага</div><div class="opt">Болзоо</div><div class="opt">Найр / Эвент</div></div></div>
+
+    <button class="generate" id="gen">Миний хувийн зөвлөгөөг гаргах →</button>
+    <div class="err" id="err"></div>
+  </div>
+</section>
+
+<div class="loader" id="loader"><div class="wrap"><div class="spin"></div><p id="loadmsg">Таны стилийг боловсруулж байна…</p></div></div>
+
+<section class="result" id="result">
+  <div class="wrap">
+    <div class="report" id="report"></div>
+    <div class="actions" id="actions">
+      <button class="btn-line" id="pdf">⤓ PDF татах</button>
+      <button class="btn-line" id="again">↺ Дахин бөглөх</button>
+    </div>
+  </div>
+</section>
+
+<div class="foot">MyStyle AI · Зөвлөгөөг AI гаргасан тул эцсийн шийдвэр танайх.</div>
+
+<script>
+(function(){
+  const answers = {};
+  let selfieB64=null, selfieMime=null;
+
+  document.querySelectorAll('.opts').forEach(group=>{
+    const key=group.dataset.q;
+    group.querySelectorAll('.opt').forEach(opt=>{
+      opt.addEventListener('click',()=>{
+        group.querySelectorAll('.opt').forEach(o=>o.classList.remove('sel'));
+        opt.classList.add('sel'); answers[key]=opt.textContent.trim();
+      });
+    });
+  });
+
+  document.getElementById('start').addEventListener('click',()=>document.getElementById('quiz').scrollIntoView({behavior:'smooth'}));
+
+  const selfieInput=document.getElementById('selfie');
+  selfieInput.addEventListener('change',e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const r=reader.result; selfieB64=r.split(',')[1]; selfieMime=f.type||'image/jpeg';
+      document.getElementById('pimg').src=r;
+      document.getElementById('preview').style.display='flex';
+      document.getElementById('uplabel').style.display='none';
+    };
+    reader.readAsDataURL(f);
+  });
+  document.getElementById('premove').addEventListener('click',()=>{
+    selfieB64=null;selfieMime=null;selfieInput.value='';
+    document.getElementById('preview').style.display='none';
+    document.getElementById('uplabel').style.display='block';
+  });
+
+  const loadMsgs=["Таны биеийн онцлогийг уншиж байна…","Тохирох өнгөний palette сонгож байна…","Үсний засалтын хувилбаруудыг бодож байна…","Гутал, аксессуар сонгож байна…","Гоо сайханы зөвлөгөө бэлтгэж байна…","Улиралын wardrobe бодож байна…","Дэлгүүрийн зөвлөмж эмхэтгэж байна…","Хувийн тайланг нэгтгэж байна…"];
+
+  document.getElementById('gen').addEventListener('click',generate);
+  document.getElementById('again').addEventListener('click',()=>{
+    document.getElementById('result').style.display='none';
+    document.getElementById('quiz').style.display='block';
+    document.getElementById('quiz').scrollIntoView({behavior:'smooth'});
+  });
+  document.getElementById('pdf').addEventListener('click',()=>window.print());
+
+  function ubSeason(){
+    const m=new Date().getMonth()+1;
+    if(m>=12||m<=2) return "хүйтэн өвөл (−15°C-аас доош байж болзошгүй)";
+    if(m>=3&&m<=5) return "салхитай, хувирамтгай хавар";
+    if(m>=6&&m<=8) return "сэрүүн зун";
+    return "сэрүүсэж буй намар";
+  }
+
+  async function generate(){
+    const err=document.getElementById('err'); err.style.display='none';
+    if(!answers.gender||!answers.body||!answers.occasion){
+      err.textContent="Хүйс, биеийн хэлбэр, нөхцөлөө сонгоно уу."; err.style.display='block'; return;
+    }
+    const btn=document.getElementById('gen'); btn.disabled=true;
+    document.getElementById('quiz').style.display='none';
+    const loader=document.getElementById('loader'); loader.style.display='block';
+    loader.scrollIntoView({behavior:'smooth'});
+    let mi=0; const lm=document.getElementById('loadmsg');
+    const timer=setInterval(()=>{mi=(mi+1)%loadMsgs.length;lm.textContent=loadMsgs[mi];},1800);
+
+    const payload={
+      gender:answers.gender, height:document.getElementById('height').value,
+      weight:document.getElementById('weight').value, body:answers.body,
+      face:answers.face, skin:answers.skin, undertone:answers.undertone,
+      style:answers.style, occasion:answers.occasion, season:ubSeason(),
+      selfie: selfieB64 ? {b64:selfieB64, mime:selfieMime} : null
+    };
+
+    try{
+      const res=await fetch("/api/style",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      const data=await res.json();
+      if(!res.ok||data.error) throw new Error(data.error||"алдаа");
+      render(data);
+    }catch(ex){
+      console.error(ex);
+      err.textContent="Зөвлөгөө гаргахад алдаа гарлаа. Дахин оролдоно уу.";
+      document.getElementById('quiz').style.display='block'; err.style.display='block';
+    }finally{
+      clearInterval(timer); loader.style.display='none'; btn.disabled=false;
+    }
+  }
+
+  function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+  function liList(arr,cls){return '<ul class="list '+(cls||'')+'">'+(arr||[]).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';}
+
+  function render(r){
+    const sw=(r.ongo||[]).map(c=>'<div class="sw"><div class="chip" style="background:'+esc(c.hex)+'"></div><div class="nm">'+esc(c.ner)+'<br>'+esc(c.hex)+'</div></div>').join('');
+    const outfits=(r.outfit||[]).map(o=>'<div class="outfit"><div class="o-h">'+esc(o.nohtsol)+'</div><p>'+esc(o.tailbar)+'</p></div>').join('');
+    const shopping=(r.shopping||[]).map(s=>'<div class="outfit"><div class="o-h">'+esc(s.zuil)+'</div><p>'+esc(s.yagaad)+'</p></div>').join('');
+    const delguurHtml=(r.delguur||[]).map(d=>'<div class="outfit"><div class="o-h">'+esc(d.ner)+'</div><p>'+esc(d.turul)+'</p></div>').join('');
+    const today=r.udur?'<div class="today"><div class="t-h">Өнөөдөр Улаанбаатарт</div><div class="t-w">'+esc(r.udur.tsag_agaar)+'</div><p>'+esc(r.udur.sanal)+'</p></div>':'';
+
+    document.getElementById('report').innerHTML=
+      '<div class="head"><div class="eyebrow">Таны хувийн стилийн тайлан</div><h3 class="serif">MyStyle Report</h3></div>'+
+      '<div class="sec"><p class="intro-text serif" style="font-size:18px">'+esc(r.tovch)+'</p></div>'+today+
+      '<div class="rule"></div>'+
+      '<div class="sec"><div class="stitle"><span class="n">1</span><span>Тохирох хэлбэр</span></div>'+liList(r.siluet)+'</div>'+
+      '<div class="sec"><div class="stitle"><span class="n">2</span><span>Илүү зохимжтой</span></div>'+liList(r.songoh)+'</div>'+
+      '<div class="sec"><div class="stitle"><span class="n">3</span><span>Болгоомжлох</span></div>'+liList(r.bolgoomj,'avoid')+'</div>'+
+      '<div class="sec"><div class="stitle"><span class="n">4</span><span>Өнгөний palette</span></div><div class="palette">'+sw+'</div></div>'+
+      '<div class="sec"><div class="stitle"><span class="n">5</span><span>Үсний засалт</span></div>'+liList(r.us)+'</div>'+
+      '<div class="sec"><div class="stitle"><span class="n">6</span><span>Outfit санаа</span></div>'+outfits+'</div>'+
+      '<div class="sec"><div class="stitle"><span class="n">7</span><span>Гутлын зөвлөгөө</span></div>'+liList(r.gutal)+'</div>'+
+      '<div class="sec"><div class="stitle"><span class="n">8</span><span>Аксессуар</span></div>'+liList(r.accessor)+'</div>'+
+      '<div class="sec"><div class="stitle"><span class="n">9</span><span>Гоо сайханы зөвлөгөө</span></div>'+liList(r.goo)+'</div>'+
+      '<div class="sec"><div class="stitle"><span class="n">10</span><span>Улиралын wardrobe</span></div>'+liList(r.uliral)+'</div>'+
+      '<div class="sec"><div class="stitle"><span class="n">11</span><span>Дэлгүүрийн зөвлөмж</span></div>'+delguurHtml+'</div>'+
+      '<div class="sec"><div class="stitle"><span class="n">12</span><span>Худалдан авалтын зөвлөмж</span></div>'+
+        '<div class="premium" id="premium"><div class="badge">Premium</div>'+
+        '<h4 class="serif">Бүрэн стайл тайлан + дэлгүүрийн зөвлөмж</h4>'+
+        '<p class="p-d">Чиний шүүгээнд дутаж буй, авбал бусад хувцастай хослох хувцасны жагсаалт, бүрэн PDF тайлан, шинэчлэгдэх зөвлөгөө.</p>'+
+        '<ul class="p-list"><li>Хувийн худалдан авалтын жагсаалт</li><li>Бүрэн PDF стайл тайлан</li><li>Хязгааргүй outfit хослол</li><li>Улирал бүрийн шинэчлэл</li></ul>'+
+        '<button class="p-btn" id="unlock">Premium авах — 5,000₮</button>'+
+        '<div class="p-note">Demo: төлбөр аваагүй, зүгээр нээгдэнэ</div></div>'+
+        '<div id="unlocked" style="display:none">'+shopping+'</div></div>';
+
+    document.getElementById('unlock').addEventListener('click',()=>{
+      document.getElementById('premium').style.display='none';
+      document.getElementById('unlocked').style.display='block';
+      // Validation: энд серверт "premium дарсан" event илгээж тоолж болно
+    });
+    document.getElementById('result').style.display='block';
+    document.getElementById('result').scrollIntoView({behavior:'smooth'});
+  }
+})();
+</script>
+</body>
+</html>
