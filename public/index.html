@@ -92,6 +92,14 @@
   .privacy-note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;display:flex;align-items:flex-start;gap:6px}
   .privacy-note::before{content:"🔒";font-size:13px;flex:none;margin-top:1px}
 
+  /* Wardrobe upload */
+  .wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:10px;margin-top:14px}
+  .wthumb{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+  .wthumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .wthumb .wrm{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(34,31,26,.72);color:#fff;font-size:12px;line-height:20px;text-align:center;cursor:pointer;-webkit-user-select:none;user-select:none}
+  .wcount{font-size:12px;color:var(--muted);margin-top:10px}
+  .wcap{color:var(--accent-dark)}
+
   .generate{width:100%;margin-top:10px;appearance:none;border:none;cursor:pointer;background:var(--accent);color:#fff;font-family:'Manrope';font-weight:800;font-size:16px;padding:17px;border-radius:14px;letter-spacing:.02em;transition:background .18s,transform .15s}
   .generate:hover{background:var(--accent-dark);transform:translateY(-1px)}
   .generate:disabled{opacity:.55;cursor:wait;transform:none}
@@ -131,6 +139,15 @@
   .ocard:last-child{margin-bottom:0}
   .ocard .o-h{font-weight:800;font-size:13px;color:var(--accent-dark);margin-bottom:5px}
   .ocard p{font-size:14px;line-height:1.55}
+
+  /* Wardrobe results */
+  .wi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:12px}
+  .wi-item{text-align:center}
+  .wi-item img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:1px solid var(--line);margin-bottom:6px}
+  .wi-tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.04em;color:var(--accent-dark);background:rgba(181,72,43,.09);border-radius:100px;padding:2px 9px;margin-bottom:3px}
+  .wi-d{font-size:11px;color:var(--muted);line-height:1.35}
+  .wo-imgs{display:flex;gap:6px;margin-bottom:10px}
+  .wo-imgs img{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
 
   /* Premium block */
   .premium{border:1.5px solid var(--gold);border-radius:16px;padding:24px;text-align:center;background:linear-gradient(180deg,#FBF6E9,#F5ECD6)}
@@ -273,6 +290,13 @@
       <div class="privacy-note">Таны зураг серверт <strong>хадгалагдахгүй</strong>. Зөвхөн AI шинжилгээнд нэг удаа ашиглагдаад шууд устгагдана. Бид таны нууцлалыг хүндэлнэ.</div>
     </div>
 
+    <div class="field">
+      <label>Таны хувцасны шүүгээ <span class="hint">(заавал биш — байгаа хувцаснуудынхаа зургийг оруулбал AI тэднийг цамц, өмд гэх мэтээр ялгаад тэдгээрээр хослол зөвлөнө)</span></label>
+      <label class="upload" id="wuplabel"><div class="u-ico">🧺</div><div class="u-t">Хувцасны зураг нэмэх</div><div class="u-s">Хэдэн ч зураг оруулж болно · нэг эсвэл олноор сонгоно</div><input type="file" id="wardrobe" accept="image/*" multiple></label>
+      <div class="wgrid" id="wgrid"></div>
+      <div class="wcount" id="wcount"></div>
+    </div>
+
     <div class="field" id="face-field">
       <label id="face-label">Нүүрний хэлбэр <span class="hint">(зураг оруулбал алгасаж болно)</span></label>
       <div class="opts" data-q="face"><div class="opt">Дугуй</div><div class="opt">Зууван</div><div class="opt">Дөрвөлжин</div><div class="opt">Зүрх хэлбэр</div><div class="opt">Сунгасан</div><div class="opt">Мэдэхгүй</div></div>
@@ -313,6 +337,8 @@
 (function(){
   const answers = {};
   let selfieB64=null, selfieMime=null;
+  const WARDROBE_CAP=20;
+  let wardrobe=[], lastSentWardrobe=[], wardrobeCapNotice='';
 
   document.querySelectorAll('.opts').forEach(group=>{
     const key=group.dataset.q;
@@ -354,6 +380,68 @@
     faceLabel.innerHTML='Нүүрний хэлбэр <span class="hint">(зураг оруулбал алгасаж болно)</span>';
   });
 
+  function resizeImage(file){
+    return new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>{
+        const img=new Image();
+        img.onload=()=>{
+          const maxDim=1024;
+          let w=img.width, h=img.height;
+          if(w>h && w>maxDim){h=Math.round(h*maxDim/w); w=maxDim;}
+          else if(h>=w && h>maxDim){w=Math.round(w*maxDim/h); h=maxDim;}
+          const canvas=document.createElement('canvas');
+          canvas.width=w; canvas.height=h;
+          canvas.getContext('2d').drawImage(img,0,0,w,h);
+          const dataUrl=canvas.toDataURL('image/jpeg',0.82);
+          resolve({b64:dataUrl.split(',')[1], mime:'image/jpeg', dataUrl});
+        };
+        img.onerror=()=>reject(new Error('image load failed'));
+        img.src=reader.result;
+      };
+      reader.onerror=()=>reject(new Error('file read failed'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const wardrobeInput=document.getElementById('wardrobe');
+  const wgrid=document.getElementById('wgrid');
+  const wcountEl=document.getElementById('wcount');
+
+  function renderWgrid(){
+    wgrid.innerHTML=wardrobe.map((w,i)=>
+      '<div class="wthumb"><img src="'+w.dataUrl+'" alt=""><span class="wrm" data-i="'+i+'">✕</span></div>'
+    ).join('');
+    wgrid.querySelectorAll('.wrm').forEach(el=>{
+      el.addEventListener('click',()=>{
+        wardrobe.splice(Number(el.dataset.i),1);
+        wardrobeCapNotice='';
+        renderWgrid();
+      });
+    });
+    wcountEl.innerHTML=(wardrobe.length? wardrobe.length+' / '+WARDROBE_CAP+' зураг сонгосон':'')+
+      (wardrobeCapNotice? ' <span class="wcap">'+wardrobeCapNotice+'</span>':'');
+  }
+
+  wardrobeInput.addEventListener('change', async e=>{
+    const files=Array.from(e.target.files||[]);
+    wardrobeInput.value='';
+    if(!files.length) return;
+    const room=WARDROBE_CAP-wardrobe.length;
+    if(room<=0){
+      wardrobeCapNotice='Хамгийн ихдээ '+WARDROBE_CAP+' зураг оруулах боломжтой.';
+      renderWgrid();
+      return;
+    }
+    const take=files.slice(0,room);
+    for(const f of take){
+      try{ wardrobe.push(await resizeImage(f)); }catch(ex){ console.error(ex); }
+    }
+    wardrobeCapNotice = files.length>take.length ?
+      'Хамгийн ихдээ '+WARDROBE_CAP+' зураг. Зарим зураг нэмэгдсэнгүй.' : '';
+    renderWgrid();
+  });
+
   const loadMsgs=[
     "Таны биеийн онцлогийг уншиж байна…",
     "Тохирох өнгөний palette сонгож байна…",
@@ -393,12 +481,14 @@
     let mi=0; const lm=document.getElementById('loadmsg');
     const timer=setInterval(()=>{mi=(mi+1)%loadMsgs.length; lm.textContent=loadMsgs[mi];},1800);
 
+    lastSentWardrobe=wardrobe.slice(0,WARDROBE_CAP);
     const payload={
       gender:answers.gender, height:document.getElementById('height').value,
       weight:document.getElementById('weight').value, body:answers.body,
       face:answers.face, skin:answers.skin, undertone:answers.undertone,
       style:answers.style, occasion:answers.occasion, season:ubSeason(),
-      selfie: selfieB64 ? {b64:selfieB64, mime:selfieMime} : null
+      selfie: selfieB64 ? {b64:selfieB64, mime:selfieMime} : null,
+      wardrobe: lastSentWardrobe.map(w=>({b64:w.b64, mime:w.mime}))
     };
 
     try{
@@ -419,6 +509,11 @@
   function liList(arr,cls){return '<ul class="list '+(cls||'')+'">'+(arr||[]).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';}
   function oCard(h,d){return '<div class="ocard"><div class="o-h">'+esc(h)+'</div><p>'+esc(d)+'</p></div>';}
 
+  function wThumbSrc(index){
+    const w=lastSentWardrobe[(index|0)-1];
+    return w ? w.dataUrl : '';
+  }
+
   function render(r){
     const sw=(r.ongo||[]).map(c=>'<div class="sw"><div class="chip" style="background:'+esc(c.hex)+'"></div><div class="nm">'+esc(c.ner)+'<br>'+esc(c.hex)+'</div></div>').join('');
     const outfits=(r.outfit||[]).map(o=>oCard(o.nohtsol,o.tailbar)).join('');
@@ -426,6 +521,22 @@
     const delguurHtml=(r.delguur||[]).map(d=>oCard(d.ner,d.turul)).join('');
     const todayHtml=r.udur?
       '<div class="r-today"><div class="t-h">Өнөөдөр Улаанбаатарт</div><div class="t-w">'+esc(r.udur.tsag_agaar)+'</div><div class="t-p">'+esc(r.udur.sanal)+'</div></div>':'';
+
+    const witems=(r.wardrobe||[]).map(it=>{
+      const src=wThumbSrc(it.index); if(!src) return '';
+      return '<div class="wi-item"><img src="'+src+'" alt=""><div class="wi-tag">'+esc(it.torol)+'</div><div class="wi-d">'+esc(it.ongo||'')+(it.tailbar?' · '+esc(it.tailbar):'')+'</div></div>';
+    }).join('');
+    const woutfits=(r.wardrobe_outfit||[]).map(o=>{
+      const imgs=(o.indexuud||[]).map(i=>{const s=wThumbSrc(i); return s?'<img src="'+s+'" alt="">':'';}).join('');
+      return '<div class="ocard"><div class="wo-imgs">'+imgs+'</div><div class="o-h">'+esc(o.nohtsol)+'</div><p>'+esc(o.tailbar)+'</p></div>';
+    }).join('');
+    const wardrobeCard=witems ?
+      '<div class="r-card">'+
+        '<div class="r-card-head"><span class="rh-ico">🧺</span>Таны шүүгээ</div>'+
+        '<div class="r-sub">Танилцуулсан хувцаснууд</div>'+
+        '<div class="wi-grid">'+witems+'</div>'+
+        (woutfits?'<div class="r-sub" style="margin-top:22px">Таны хувцаснаас хийсэн хослол</div>'+woutfits:'')+
+      '</div>' : '';
 
     document.getElementById('report').innerHTML=
 
@@ -458,6 +569,8 @@
         '<div class="r-card-head"><span class="rh-ico">✨</span>Outfit санаа</div>'+
         outfits+
       '</div>'+
+
+      wardrobeCard+
 
       // Card 5 — Гутал & Аксессуар
       '<div class="r-card">'+

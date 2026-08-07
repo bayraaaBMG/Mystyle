@@ -9,7 +9,7 @@ const express = require("express");
 const path = require("path");
 
 const app = express();
-app.use(express.json({ limit: "8mb" })); // selfie зураг багтаахаар лимит өндөр
+app.use(express.json({ limit: "30mb" })); // selfie + олон хувцасны зураг багтаахаар лимит өндөр
 app.use(express.static(path.join(__dirname, "public")));
 
 const API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -24,6 +24,8 @@ app.post("/api/style", async (req, res) => {
   const a = req.body || {};
   const season = a.season || "тодорхойгүй улирал";
   const hasPhoto = a.selfie && a.selfie.b64;
+  const wardrobe = Array.isArray(a.wardrobe) ? a.wardrobe.filter((w) => w && w.b64).slice(0, 20) : [];
+  const hasWardrobe = wardrobe.length > 0;
 
   const profile = `Хүйс: ${a.gender || "?"}
 Өндөр: ${a.height || "?"} см, Жин: ${a.weight || "хэлээгүй"} кг
@@ -34,7 +36,11 @@ app.post("/api/style", async (req, res) => {
 Нөхцөл: ${a.occasion || "?"}
 Байршил: Улаанбаатар. Одоогийн улирал: ${season}`;
 
-  const promptText = `Чи бол туршлагатай, эелдэг хувийн стилист. Доорх хүний мэдээлэлд тулгуурлан Монгол хэлээр хувийн стилийн зөвлөгөө гаргана уу.${hasPhoto ? " Хавсаргасан selfie зургаас нүүрний хэлбэр болон арьсны өнгөлгийг ажиглан тооцоонд аваарай." : ""}
+  const wardrobeNote = hasWardrobe
+    ? ` Хавсаргасан "Хувцасны зураг #N" гэж тэмдэглэсэн ${wardrobe.length} зураг бол хэрэглэгчийн өөрийнх нь эзэмшдэг хувцас, гутал, аксессуар юм. Зураг бүрийг тус тусад нь ажиглаж, тухайн зурагны дугаарыг ("index") ашиглан төрөл (жишээ нь цамц, футболк, өмд, юбка, куртка, гутал, цүнх гэх мэт), үндсэн өнгө, материал/стилийг тодорхойл. Дараа нь ЗӨВХӨН эдгээр бодит хувцаснуудыг ашиглан (шинэ хувцас зохиомлоор нэмэхгүйгээр) хэрэглэгчийн нөхцөл, улиралд тохирсон бодит хослол (look) санал болго. Хослол бүрд аль зурагнуудыг ашигласнаа "indexuud" массивт дугаарлаж бич.`
+    : "";
+
+  const promptText = `Чи бол туршлагатай, эелдэг хувийн стилист. Доорх хүний мэдээлэлд тулгуурлан Монгол хэлээр хувийн стилийн зөвлөгөө гаргана уу.${hasPhoto ? " Хавсаргасан selfie зургаас нүүрний хэлбэр болон арьсны өнгөлгийг ажиглан тооцоонд аваарай." : ""}${wardrobeNote}
 
 ЧУХАЛ ДҮРЭМ:
 - Эерэг, өөртөө итгэлтэй болгох өнгө аяс. "Туранхай харагдуул", "доголдлоо нуу" гэх мэт сөрөг үг ХЭРЭГЛЭХГҮЙ. "Юу нь чамд илүү зохимжтой, тав тухтай харагдана" гэсэн өнцгөөр бич.
@@ -60,16 +66,23 @@ JSON бүтэц:
   "accessor":["нүүрний хэлбэр, стильд тохирох чихэвч, цүнх, аксессуарын зөвлөгөө"],
   "goo":["арьсны өнгөлөг, нүүрний онцлогт тохирох будалтын өнгө, хэлбэрийн зөвлөгөө"],
   "uliral":["одоогийн улиралд давхарлах, wardrobe-оо бэлтгэх зөвлөгөө"],
-  "delguur":[{"ner":"Монголд байдаг дэлгүүр буюу зах зээлийн нэр","turul":"ямар хэрэгцээнд, ямар хувцас авахад тохиромжтой"}]
+  "delguur":[{"ner":"Монголд байдаг дэлгүүр буюу зах зээлийн нэр","turul":"ямар хэрэгцээнд, ямар хувцас авахад тохиромжтой"}],
+  "wardrobe":[{"index":"Хувцасны зураг #N дэх N тоо","torol":"хувцасны төрөл (жишээ нь цамц, өмд, гутал)","ongo":"үндсэн өнгө","tailbar":"материал/стилийн 3-5 үгэн тайлбар"}],
+  "wardrobe_outfit":[{"nohtsol":"ямар үед өмсөхөд тохирох","indexuud":[ашигласан зурагны дугаарууд],"tailbar":"хослолын тайлбар, дутуу зүйл байвал юу нэмж авбал сайжрахыг товч дурд"}]
 }
-ongo дотор яг 6 өнгө, outfit дотор 2-3, shopping болон delguur дотор 3, gutal/accessor/goo/uliral дотор 2-3 зүйл байг.`;
+ongo дотор яг 6 өнгө, outfit дотор 2-3, shopping болон delguur дотор 3, gutal/accessor/goo/uliral дотор 2-3 зүйл байг. ${hasWardrobe ? "wardrobe массивт хавсаргасан хувцасны зураг тус бүрд яг нэг элемент байх ёстой (нийт " + wardrobe.length + " ширхэг), wardrobe_outfit дотор боломжит хослолын тоогоор (ихдээ 5) бич." : "Хувцасны зураг ирээгүй тул wardrobe болон wardrobe_outfit-ийг хоосон массив ([]) байлга."}`;
 
   let content;
-  if (hasPhoto) {
-    content = [
-      { type: "image", source: { type: "base64", media_type: a.selfie.mime || "image/jpeg", data: a.selfie.b64 } },
-      { type: "text", text: promptText },
-    ];
+  if (hasPhoto || hasWardrobe) {
+    content = [];
+    if (hasPhoto) {
+      content.push({ type: "image", source: { type: "base64", media_type: a.selfie.mime || "image/jpeg", data: a.selfie.b64 } });
+    }
+    wardrobe.forEach((w, i) => {
+      content.push({ type: "text", text: `Хувцасны зураг #${i + 1}:` });
+      content.push({ type: "image", source: { type: "base64", media_type: w.mime || "image/jpeg", data: w.b64 } });
+    });
+    content.push({ type: "text", text: promptText });
   } else {
     content = promptText;
   }
