@@ -62,6 +62,19 @@ Production дээр дараах environment variable-ууд **заавал**:
 
 Хязгаарын тохиргоо `.env.example` дотор тайлбартай байгаа.
 
+Neon дээр **Pooled connection** string ашигла (host дотор `-pooler`) — serverless-д холболт хэтрэхээс сэргийлнэ.
+
+`vercel.json` функцийн хугацааг 60 секунд (`maxDuration`), `public/` файлуудыг багцад (`includeFiles`) оруулна.
+Vercel дээр `CLAUDE_TIMEOUT_MS=55000` тавь — функц таслагдахаас өмнө Claude хүлээлт зогсож, хэрэглэгчид ойлгомжтой алдаа харагдаж, эрх нь буцна.
+
+Deploy хийсний дараа шалгах:
+```bash
+node scripts/smoke.js https://<домэйн>            # хуудас, PWA, DB холболт
+node scripts/smoke.js https://<домэйн> --write    # + түр хэрэглэгч бүртгээд устгана
+node scripts/smoke.js https://<домэйн> --report   # + бодит Claude тайлан (1 удаа, ~$0.05–0.10)
+```
+Preview хамгаалалттай бол `VERCEL_BYPASS=<token>` өгнө.
+
 Хамгийн хялбар хувилбарууд (бүгд үнэгүй tier-тэй):
 
 ### Render.com

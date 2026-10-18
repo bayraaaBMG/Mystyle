@@ -3,3 +3,5 @@ node_modules/
 *.log
 data/
 bench-out/
+.env*
+!.env.example
