@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MyStyle AI — Өөртөө тохирох хувцас, өнгө, үсээ мэд</title>
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#221F1A">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MyStyle">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Spectral:ital,wght@0,600;0,800;1,600;1,800&display=swap" rel="stylesheet">
 <style>
@@ -187,6 +192,8 @@
   /* Top bar, account */
   .topbar{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:16px 24px 0;max-width:760px;margin:0 auto;font-size:13px}
   .topbar .who{color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar>*{white-space:nowrap}
+  @media(max-width:480px){.topbar{padding:12px 16px 0;gap:8px;flex-wrap:wrap}.topbar .who{display:none}}
   .tb-btn{appearance:none;background:none;border:1.5px solid var(--line);color:var(--ink);font-family:'Manrope';font-weight:700;font-size:13px;padding:7px 14px;border-radius:100px;cursor:pointer}
   .tb-btn:hover{border-color:var(--ink)}
   .tb-link{appearance:none;background:none;border:none;color:var(--muted);font-family:'Manrope';font-size:13px;cursor:pointer;text-decoration:underline}
@@ -227,6 +234,8 @@
 <body>
 
 <div class="topbar" id="topbar">
+  <button type="button" class="tb-link" id="install" style="display:none" title="Апп болгон суулгах">📲 Суулгах</button>
+  <a class="tb-link" id="admin-link" href="/admin.html" style="display:none">Админ</a>
   <span class="who" id="who"></span>
   <button type="button" class="tb-btn" id="myreports" style="display:none">Миний тайлангууд</button>
   <button type="button" class="tb-btn" id="login">Нэвтрэх</button>
@@ -545,13 +554,17 @@
   let me=null, lastClaimToken=null, authMode='register';
   const $=id=>document.getElementById(id);
 
+  // /s/<slug> хуудсаас орсон бол бүх хүсэлтэд дэлгүүрийг дагуулна
+  const STORE=(location.pathname.match(/^\/s\/([a-z0-9-]+)/)||[])[1]||null;
+  const baseHeaders=()=>Object.assign({"Content-Type":"application/json"},STORE?{"X-Store":STORE}:{});
+
   async function api(path,opts){
-    const res=await fetch(path,Object.assign({headers:{"Content-Type":"application/json"}},opts||{}));
+    const res=await fetch(path,Object.assign({headers:baseHeaders()},opts||{}));
     let data={}; try{ data=await res.json(); }catch(e){}
     if(!res.ok) { const e=new Error(data.error||'алдаа'); e.status=res.status; e.data=data; throw e; }
     return data;
   }
-  function track(event){ fetch('/api/track',{method:'POST',headers:{"Content-Type":"application/json"},body:JSON.stringify({event})}).catch(()=>{}); }
+  function track(event){ fetch('/api/track',{method:'POST',headers:baseHeaders(),body:JSON.stringify({event})}).catch(()=>{}); }
 
   function showQuota(q){
     if(!q) return;
@@ -570,6 +583,7 @@
       $('login').style.display=me?'none':'';
       $('logout').style.display=me?'':'none';
       $('myreports').style.display=me?'':'none';
+      $('admin-link').style.display=me&&(me.role==='SUPER_ADMIN'||me.role==='STORE_ADMIN')?'':'none';
       showQuota(d.quota);
       if(d.lastInput) prefill(d.lastInput);
     }catch(e){ console.error(e); }
@@ -670,6 +684,28 @@
   }
 
   refreshMe();
+
+  // Дэлгүүрийн нэр, өнгө
+  if(STORE){
+    api('/api/store/'+encodeURIComponent(STORE)).then(st=>{
+      document.querySelector('.hero .eyebrow').textContent=st.name+' · MyStyle AI Стилист';
+      document.title=st.name+' — MyStyle AI';
+      if(st.accent) document.documentElement.style.setProperty('--accent',st.accent);
+    }).catch(()=>{});
+  }
+
+  // PWA: service worker + суулгах товч
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(e=>console.warn('SW',e));
+  let installEvt=null;
+  window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installEvt=e; $('install').style.display=''; });
+  window.addEventListener('appinstalled',()=>{ $('install').style.display='none'; track('app_installed'); });
+  const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  if(isIos&&!standalone) $('install').style.display='';
+  $('install').addEventListener('click',async()=>{
+    if(installEvt){ installEvt.prompt(); await installEvt.userChoice; installEvt=null; $('install').style.display='none'; }
+    else if(isIos) alert('iPhone дээр: Safari-ийн доод хэсгийн «Хуваалцах» (⬆️) товчийг дараад «Add to Home Screen» / «Нүүр дэлгэцэнд нэмэх»-ийг сонгоно уу.');
+  });
 
   document.getElementById('gen').addEventListener('click',generate);
   document.getElementById('again').addEventListener('click',()=>{
