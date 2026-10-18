@@ -169,3 +169,33 @@ test("зэрэг ирсэн хүсэлтүүд хязгаарыг давахгү
   assert.strictEqual(results.filter((r) => r.status === 200).length, 1);
   assert.strictEqual(results.filter((r) => r.status === 429).length, occasions.length - 1);
 });
+
+test("өмнөх хариулт /api/me-д буцна, хэмжээ цэвэрлэгдэнэ", async (t) => {
+  mockClaude();
+  const { server, call } = await startServer();
+  t.after(() => { server.closeAllConnections(); server.close(); global.fetch = realFetch; });
+
+  const reg = await call("/api/auth/register", { method: "POST", body: { email: "p@q.mn", password: "password1" } });
+  let me = await call("/api/me", { cookie: reg.cookie });
+  assert.strictEqual(me.data.lastInput, null);
+
+  await call("/api/style", { method: "POST", cookie: reg.cookie, body: { ...quiz("Ажил"), chest: "90", waist: "abc", hips: "5000" } });
+  me = await call("/api/me", { cookie: reg.cookie });
+  assert.strictEqual(me.data.lastInput.occasion, "Ажил");
+  assert.strictEqual(me.data.lastInput.chest, "90");
+  assert.strictEqual(me.data.lastInput.waist, undefined);
+  assert.strictEqual(me.data.lastInput.hips, undefined);
+});
+
+test("max_tokens-д тасарсан хариу 502 болж, эрх буцна", async (t) => {
+  global.fetch = async (url, opts) =>
+    String(url).startsWith("https://api.anthropic.com")
+      ? { json: async () => ({ stop_reason: "max_tokens", content: [{ type: "text", text: '{"tovch":"тасар' }], usage: {} }) }
+      : realFetch(url, opts);
+  const { server, call } = await startServer();
+  t.after(() => { server.closeAllConnections(); server.close(); global.fetch = realFetch; });
+
+  const r = await call("/api/style", { method: "POST", body: quiz("Ажил") });
+  assert.strictEqual(r.status, 502);
+  assert.strictEqual((await call("/api/me")).data.quota.left, 1);
+});

@@ -16,6 +16,9 @@ const { buildContent, storableInput } = require("./lib/prompt");
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.MYSTYLE_MODEL || "claude-sonnet-4-6";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
+// Өнгөний тайлбар, размер нэмэгдсэн тул хариу урт — max_tokens болон хугацааг нэмсэн
+const MAX_TOKENS = Number(process.env.MAX_TOKENS) || 8000;
+const CLAUDE_TIMEOUT_MS = Number(process.env.CLAUDE_TIMEOUT_MS) || 90000;
 
 // $ / 1M token (input, output) — /api/admin/stats дээрх зардлын тооцоонд
 const PRICES = {
@@ -104,7 +107,9 @@ function createApp(store = createStore()) {
   app.get("/api/me", wrap(async (req, res) => {
     const user = await currentUser(req);
     const quota = await limits.remaining(store, { userId: user && user.id, ipHash: ipHash(req) });
-    res.json({ user: user ? { id: user.id, email: user.email } : null, quota });
+    // Өмнөх тестийн хариулт — дахин бөглөхөд урьдчилан бөглөнө
+    const lastInput = user ? await store.getLastInput(user.id) : null;
+    res.json({ user: user ? { id: user.id, email: user.email } : null, quota, lastInput });
   }));
 
   // Бүртгэл болон бүх тайланг бүрмөсөн устгах (privacy)
@@ -218,7 +223,7 @@ function createApp(store = createStore()) {
 
 async function callClaude(content) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 55000);
+  const timeout = setTimeout(() => controller.abort(), CLAUDE_TIMEOUT_MS);
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -228,10 +233,11 @@ async function callClaude(content) {
         "x-api-key": API_KEY,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify({ model: MODEL, max_tokens: 4000, messages: [{ role: "user", content }] }),
+      body: JSON.stringify({ model: MODEL, max_tokens: MAX_TOKENS, messages: [{ role: "user", content }] }),
     });
     const data = await r.json();
     if (data.error) throw new Error("Anthropic error: " + JSON.stringify(data.error));
+    if (data.stop_reason === "max_tokens") throw new Error("Хариу max_tokens-д хүрч тасарсан: " + JSON.stringify(data.usage));
 
     let text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();

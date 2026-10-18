@@ -135,6 +135,20 @@
   .sw{text-align:center;width:76px}
   .sw .chip{height:56px;border-radius:10px;border:1px solid rgba(0,0,0,.08);margin-bottom:7px}
   .sw .nm{font-size:11px;color:var(--muted);line-height:1.3}
+  .ongo-tovch{font-size:14px;color:var(--muted);margin-bottom:16px}
+  .cdetail{display:flex;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+  .cdetail .cd-chip{flex:none;width:44px;height:44px;border-radius:10px;border:1px solid rgba(0,0,0,.08)}
+  .cdetail .cd-name{font-weight:800;font-size:14px;margin-bottom:4px}
+  .cdetail .cd-name span{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+  .cdetail p{font-size:13.5px;line-height:1.5;margin-bottom:3px}
+  .cdetail b{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-dark);margin-right:4px}
+  .sizes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
+  @media(max-width:480px){.sizes{grid-template-columns:1fr}}
+  .size-box{border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:center}
+  .size-box .sb-l{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .size-box .sb-v{font-family:'Spectral',serif;font-weight:800;font-size:20px;line-height:1.2}
+  .fit-tag{display:inline-block;font-size:11px;font-weight:800;color:#fff;background:var(--ink);border-radius:100px;padding:2px 10px;margin-left:6px;vertical-align:1px}
+  .size-note{font-size:13px;color:var(--muted);margin-top:12px}
   .ocard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px}
   .ocard:last-child{margin-bottom:0}
   .ocard .o-h{font-weight:800;font-size:13px;color:var(--accent-dark);margin-bottom:5px}
@@ -332,6 +346,13 @@
     <div class="row">
       <div class="field"><label>Өндөр <span class="hint">(см)</span></label><input type="number" id="height" placeholder="жишээ нь: 170"></div>
       <div class="field"><label>Жин <span class="hint">(кг — заавал биш)</span></label><input type="number" id="weight" placeholder="жишээ нь: 65"></div>
+    </div>
+
+    <div class="field" style="margin-bottom:8px"><label>Биеийн хэмжээ <span class="hint">(см — заавал биш, оруулбал размерийн зөвлөмж илүү нарийн болно)</span></label></div>
+    <div class="row">
+      <div class="field"><input type="number" id="chest" placeholder="Цээж"></div>
+      <div class="field"><input type="number" id="waist" placeholder="Бэлхүүс"></div>
+      <div class="field"><input type="number" id="hips" placeholder="Ташаа"></div>
     </div>
 
     <div class="field">
@@ -550,7 +571,21 @@
       $('logout').style.display=me?'':'none';
       $('myreports').style.display=me?'':'none';
       showQuota(d.quota);
+      if(d.lastInput) prefill(d.lastInput);
     }catch(e){ console.error(e); }
+  }
+
+  // Өмнөх хариултаар бөглөнө — хэрэглэгч аль хэдийн бөглөж эхэлсэн бол хүрэхгүй
+  function prefill(inp){
+    if(Object.keys(answers).length||$('height').value) return;
+    document.querySelectorAll('.opts').forEach(group=>{
+      const v=inp[group.dataset.q]; if(!v) return;
+      group.querySelectorAll('.opt').forEach(o=>{
+        if(o.textContent.trim()===v){ o.classList.add('sel'); answers[group.dataset.q]=v; }
+      });
+    });
+    ['height','weight','chest','waist','hips'].forEach(k=>{ if(inp[k]) $(k).value=inp[k]; });
+    $('quiz').querySelector('.sub').textContent='Өмнөх хариултаар бөглөсөн байна — өөрчлөх зүйлээ засаад дахин гаргаарай.';
   }
 
   function openModal(id){ $(id).classList.add('open'); }
@@ -669,6 +704,7 @@
     const payload={
       gender:answers.gender, height:document.getElementById('height').value,
       weight:document.getElementById('weight').value, body:answers.body,
+      chest:$('chest').value, waist:$('waist').value, hips:$('hips').value,
       face:answers.face, skin:answers.skin, undertone:answers.undertone,
       style:answers.style, occasion:answers.occasion, season:ubSeason(),
       selfie: selfieB64 ? {b64:selfieB64, mime:selfieMime} : null,
@@ -690,6 +726,7 @@
     }
   }
 
+  function hex(h){ return /^#[0-9a-fA-F]{3,8}$/.test(h||'')?h:'transparent'; }
   function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
   function liList(arr,cls){return '<ul class="list '+(cls||'')+'">'+(arr||[]).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';}
   function oCard(h,d){return '<div class="ocard"><div class="o-h">'+esc(h)+'</div><p>'+esc(d)+'</p></div>';}
@@ -701,7 +738,27 @@
 
   function render(r,opts){
     saveBanner(opts||{});
-    const sw=(r.ongo||[]).map(c=>'<div class="sw"><div class="chip" style="background:'+esc(c.hex)+'"></div><div class="nm">'+esc(c.ner)+'<br>'+esc(c.hex)+'</div></div>').join('');
+    const cdetails=(r.ongo||[]).filter(c=>c.yagaad||c.ilerhiilel||c.setgegdel).map(c=>
+      '<div class="cdetail"><div class="cd-chip" style="background:'+hex(c.hex)+'"></div><div>'+
+        '<div class="cd-name">'+esc(c.ner)+'<span>'+esc(c.hex)+'</span></div>'+
+        (c.yagaad?'<p><b>Яагаад</b>'+esc(c.yagaad)+'</p>':'')+
+        (c.ilerhiilel?'<p><b>Харагдах байдал</b>'+esc(c.ilerhiilel)+'</p>':'')+
+        (c.setgegdel?'<p><b>Сэтгэгдэл</b>'+esc(c.setgegdel)+'</p>':'')+
+      '</div></div>').join('');
+    const z=r.razmer;
+    const sizeCard=z?
+      '<div class="r-card">'+
+        '<div class="r-card-head"><span class="rh-ico">📏</span>Размер &amp; Загвар</div>'+
+        '<div class="sizes">'+
+          [['Ерөнхий',z.useg],['Дээд хувцас',z.deed],['Өмд / юбка',z.dood]].filter(x=>x[1]).map(x=>
+            '<div class="size-box"><div class="sb-l">'+x[0]+'</div><div class="sb-v">'+esc(x[1])+'</div></div>').join('')+
+        '</div>'+
+        (z.brand?'<p class="size-note">'+esc(z.brand)+'</p>':'')+
+        ((z.zagvar||[]).length?'<div class="r-sub" style="margin-top:20px">Тохирох загвар (fit)</div>'+
+          (z.zagvar||[]).map(f=>'<div class="ocard"><div class="o-h">'+esc(f.turul)+(f.fit?'<span class="fit-tag">'+esc(f.fit)+'</span>':'')+'</div><p>'+esc(f.yagaad)+'</p></div>').join(''):'')+
+        (z.hemjih?'<p class="size-note">📐 '+esc(z.hemjih)+'</p>':'')+
+      '</div>' : '';
+    const sw=(r.ongo||[]).map(c=>'<div class="sw"><div class="chip" style="background:'+hex(c.hex)+'"></div><div class="nm">'+esc(c.ner)+'<br>'+esc(c.hex)+'</div></div>').join('');
     const outfits=(r.outfit||[]).map(o=>oCard(o.nohtsol,o.tailbar)).join('');
     const shopping=(r.shopping||[]).map(s=>oCard(s.zuil,s.yagaad)).join('');
     const delguurHtml=(r.delguur||[]).map(d=>oCard(d.ner,d.turul)).join('');
@@ -746,9 +803,13 @@
       '<div class="r-card">'+
         '<div class="r-card-head"><span class="rh-ico">🎨</span>Өнгө &amp; Үс</div>'+
         '<div class="r-sub">Өнгөний palette</div>'+
+        (r.ongo_tovch?'<p class="ongo-tovch">'+esc(r.ongo_tovch)+'</p>':'')+
         '<div class="palette">'+sw+'</div>'+
+        (cdetails?'<div class="r-sub" style="margin-top:22px">Өнгө бүр танд юу өгөх вэ</div>'+cdetails:'')+
         '<div class="r-sub" style="margin-top:22px">Үсний засалт</div>'+liList(r.us)+
       '</div>'+
+
+      sizeCard+
 
       // Card 4 — Outfit санаа
       '<div class="r-card">'+
