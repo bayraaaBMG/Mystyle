@@ -5,6 +5,7 @@ process.env.ANTHROPIC_API_KEY = "test-key";
 process.env.ADMIN_TOKEN = "admin-secret";
 process.env.FREE_ANON_PER_DAY = "1";
 process.env.FREE_USER_PER_MONTH = "2";
+process.env.SUPER_ADMIN_EMAILS = "boss@my.mn";
 
 const test = require("node:test");
 const assert = require("node:assert");
@@ -33,7 +34,7 @@ async function freshStore() {
   if (!PG_URL) return createFileStore(null);
   const { Pool } = require("pg");
   const pool = new Pool({ connectionString: PG_URL });
-  await pool.query("drop table if exists reports, users, quota_usage, report_cache, events cascade");
+  await pool.query("drop table if exists reports, users, quota_usage, report_cache, events, stores cascade");
   await pool.end();
   return createPgStore(PG_URL);
 }
@@ -45,14 +46,18 @@ async function startServer() {
   server.on("close", () => store.close && store.close());
   await new Promise((r) => server.once("listening", r));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const call = async (path, { method = "GET", body, cookie } = {}) => {
+  const call = async (path, { method = "GET", body, cookie, headers = {} } = {}) => {
     const res = await realFetch(base + path, {
       method,
-      headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
+      redirect: "manual",
+      headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}), ...headers },
       body: body ? JSON.stringify(body) : undefined,
     });
     const setCookie = res.headers.get("set-cookie");
-    return { status: res.status, data: await res.json(), cookie: setCookie && setCookie.split(";")[0] };
+    const text = await res.text();
+    let data = text;
+    try { data = JSON.parse(text); } catch (e) { /* HTML */ }
+    return { status: res.status, data, cookie: setCookie && setCookie.split(";")[0], location: res.headers.get("location") };
   };
   return { server, call };
 }
@@ -198,4 +203,84 @@ test("max_tokens-д тасарсан хариу 502 болж, эрх буцна"
   const r = await call("/api/style", { method: "POST", body: quiz("Ажил") });
   assert.strictEqual(r.status, 502);
   assert.strictEqual((await call("/api/me")).data.quota.left, 1);
+});
+
+test("multi-tenant: дэлгүүр, роль, store_id, дэлгүүрийн хязгаар", async (t) => {
+  mockClaude();
+  const { server, call } = await startServer();
+  t.after(() => { server.closeAllConnections(); server.close(); global.fetch = realFetch; });
+  const reg = (email) => call("/api/auth/register", { method: "POST", body: { email, password: "password1" } }).then((r) => r.cookie);
+
+  const boss = await reg("boss@my.mn");
+  const shopAdmin = await reg("shop@my.mn");
+  const customer = await reg("cust@my.mn");
+  assert.strictEqual((await call("/api/me", { cookie: boss })).data.user.role, "SUPER_ADMIN");
+  assert.strictEqual((await call("/api/me", { cookie: customer })).data.user.role, "USER");
+
+  // Эрхийн шалгалт
+  assert.strictEqual((await call("/api/admin/stores")).status, 401);
+  assert.strictEqual((await call("/api/admin/stores", { cookie: customer })).status, 403);
+  assert.strictEqual((await call("/api/admin/stats", { cookie: customer })).status, 403);
+
+  // Дэлгүүр үүсгэх
+  let r = await call("/api/admin/stores", { method: "POST", cookie: boss, body: { name: "Nomin Fashion", slug: "nomin", accent: "#123456", dailyCap: 1 } });
+  assert.strictEqual(r.status, 200);
+  const nomin = r.data.store;
+  assert.strictEqual((await call("/api/admin/stores", { method: "POST", cookie: boss, body: { name: "X", slug: "nomin" } })).status, 409);
+  assert.strictEqual((await call("/api/admin/stores", { method: "POST", cookie: boss, body: { name: "X", slug: "Bad Slug!" } })).status, 400);
+  r = await call("/api/admin/stores", { method: "POST", cookie: boss, body: { name: "Other", slug: "other" } });
+  const other = r.data.store;
+
+  // Дэлгүүрийн хуудас, PWA manifest
+  r = await call("/s/nomin");
+  assert.strictEqual(r.status, 200);
+  assert.ok(r.data.includes('href="/s/nomin/manifest.json"'));
+  r = await call("/s/nomin/manifest.json");
+  assert.strictEqual(r.data.start_url, "/s/nomin");
+  assert.strictEqual(r.data.name, "Nomin Fashion — MyStyle AI");
+  assert.strictEqual((await call("/s/unknown")).status, 302);
+  assert.strictEqual((await call("/api/store/nomin")).data.name, "Nomin Fashion");
+
+  // Дэлгүүрээр тайлан → store_id хадгалагдана; өдрийн хязгаар (1) ажиллана
+  const X = { "X-Store": "nomin" };
+  assert.strictEqual((await call("/api/style", { method: "POST", cookie: customer, headers: X, body: quiz("Ажил") })).status, 200);
+  r = await call("/api/style", { method: "POST", cookie: customer, headers: X, body: quiz("Болзоо") });
+  assert.strictEqual(r.status, 429);
+  assert.strictEqual(r.data.code, "store");
+  // Дэлгүүргүй (үндсэн апп) тайлан
+  assert.strictEqual((await call("/api/style", { method: "POST", cookie: customer, body: quiz("Болзоо") })).status, 200);
+
+  // Дэлгүүрийн админ оноох
+  assert.strictEqual((await call(`/api/admin/stores/${nomin.id}/admins`, { method: "POST", cookie: boss, body: { email: "nobody@my.mn" } })).status, 404);
+  assert.strictEqual((await call(`/api/admin/stores/${nomin.id}/admins`, { method: "POST", cookie: boss, body: { email: "boss@my.mn" } })).status, 400);
+  r = await call(`/api/admin/stores/${nomin.id}/admins`, { method: "POST", cookie: boss, body: { email: "shop@my.mn" } });
+  assert.strictEqual(r.data.admin.role, "STORE_ADMIN");
+
+  // STORE_ADMIN зөвхөн өөрийн дэлгүүрийн нийлбэрийг харна
+  r = await call("/api/admin/stats", { cookie: shopAdmin });
+  assert.strictEqual(r.data.reports.total, 1);
+  assert.strictEqual(r.data.users, 1);
+  assert.strictEqual((await call("/api/admin/stats?store=" + other.id, { cookie: shopAdmin })).data.reports.total, 1); // ?store үл тоогдоно
+  assert.strictEqual((await call("/api/admin/stores", { cookie: shopAdmin })).status, 403);
+  assert.strictEqual((await call(`/api/admin/stores/${other.id}`, { method: "PATCH", cookie: shopAdmin, body: { name: "Hack" } })).status, 403);
+  r = await call(`/api/admin/stores/${nomin.id}`, { method: "PATCH", cookie: shopAdmin, body: { name: "Nomin 2", dailyCap: 9999, active: false } });
+  assert.strictEqual(r.data.store.name, "Nomin 2");
+  assert.strictEqual(r.data.store.daily_cap, 1); // STORE_ADMIN хязгаар өөрчлөхгүй
+  assert.strictEqual(r.data.store.active, true);
+
+  // SUPER_ADMIN: бүх систем ба дэлгүүрээр
+  assert.strictEqual((await call("/api/admin/stats", { cookie: boss })).data.reports.total, 2);
+  assert.strictEqual((await call("/api/admin/stats?store=" + nomin.id, { cookie: boss })).data.reports.total, 1);
+  r = await call("/api/admin/stores", { cookie: boss });
+  assert.strictEqual(r.data.stores.find((s) => s.id === nomin.id).admins, 1);
+
+  // Зогсоосон дэлгүүр нээгдэхгүй
+  await call(`/api/admin/stores/${nomin.id}`, { method: "PATCH", cookie: boss, body: { active: false } });
+  assert.strictEqual((await call("/api/store/nomin")).status, 404);
+  assert.strictEqual((await call("/s/nomin")).status, 302);
+
+  // Админ эрх хасах
+  const shopUser = (await call("/api/me", { cookie: shopAdmin })).data.user;
+  assert.strictEqual((await call(`/api/admin/stores/${nomin.id}/admins/${shopUser.id}`, { method: "DELETE", cookie: boss })).status, 200);
+  assert.strictEqual((await call("/api/admin/stats", { cookie: shopAdmin })).status, 403);
 });

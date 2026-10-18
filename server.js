@@ -7,6 +7,7 @@ try { process.loadEnvFile(); } catch (e) { /* .env байхгүй эсвэл х�
 
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 const crypto = require("crypto");
 const auth = require("./lib/auth");
 const limits = require("./lib/limits");
@@ -29,7 +30,16 @@ const PRICES = {
   "claude-haiku-4-5-20251001": [1, 5],
 };
 
-const TRACKABLE = new Set(["premium_click", "pdf_click", "again_click", "report_view", "pricing_click"]);
+// Роль: SUPER_ADMIN — бүх дэлгүүр; STORE_ADMIN — зөвхөн өөрийн дэлгүүр (нийлбэр статистик); USER — энгийн хэрэглэгч
+const ROLES = { SUPER_ADMIN: "SUPER_ADMIN", STORE_ADMIN: "STORE_ADMIN", USER: "USER" };
+// Эдгээр и-мэйлээр нэвтэрсэн хүн автоматаар SUPER_ADMIN болно (анхны админ үүсгэх арга)
+const SUPER_ADMIN_EMAILS = new Set(
+  String(process.env.SUPER_ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
+);
+const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+const TRACKABLE = new Set(["premium_click", "pdf_click", "again_click", "report_view", "pricing_click", "app_installed"]);
 
 function createApp(store = createStore()) {
   const app = express();
@@ -37,6 +47,9 @@ function createApp(store = createStore()) {
   app.set("trust proxy", process.env.VERCEL === "1" || process.env.TRUST_PROXY === "1");
   app.use(express.json({ limit: "30mb" })); // selfie + олон хувцасны зураг багтаахаар лимит өндөр
   app.use(express.static(path.join(__dirname, "public")));
+
+  const INDEX_HTML = fs.readFileSync(path.join(__dirname, "public", "index.html"), "utf8");
+  const BASE_MANIFEST = JSON.parse(fs.readFileSync(path.join(__dirname, "public", "manifest.json"), "utf8"));
 
   const ipHash = (req) => auth.hashIp(req.ip);
   const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
@@ -47,6 +60,29 @@ function createApp(store = createStore()) {
   async function currentUser(req) {
     const id = auth.userIdFromRequest(req);
     return id ? store.getUserById(id) : null;
+  }
+
+  // Дэлгүүрийг X-Store толгойгоос (frontend /s/<slug> хуудаснаас илгээнэ) танина. Идэвхгүй бол null.
+  async function currentStore(req) {
+    const slug = String(req.headers["x-store"] || "").toLowerCase();
+    if (!slug || !SLUG_RE.test(slug)) return null;
+    const s = await store.getStoreBySlug(slug);
+    return s && s.active ? s : null;
+  }
+
+
+  // SUPER_ADMIN_EMAILS-д байгаа хэрэглэгчийг SUPER_ADMIN болгоно
+  async function promoteIfSuper(user) {
+    if (SUPER_ADMIN_EMAILS.has(user.email) && user.role !== ROLES.SUPER_ADMIN) {
+      await store.setUserRole(user.id, ROLES.SUPER_ADMIN, null);
+    }
+  }
+
+  async function requireRole(req, res, roles) {
+    const user = await currentUser(req);
+    if (!user) { res.status(401).json({ error: "Нэвтрээгүй байна." }); return null; }
+    if (!roles.includes(user.role)) { res.status(403).json({ error: "Эрх хүрэхгүй байна." }); return null; }
+    return user;
   }
 
   async function authThrottle(req, res) {
@@ -81,7 +117,8 @@ function createApp(store = createStore()) {
     const user = await store.createUser(crypto.randomUUID(), c.email, auth.hashPassword(c.password));
     if (!user) return res.status(409).json({ error: "Энэ и-мэйлээр бүртгэл аль хэдийн байна. Нэвтэрнэ үү." });
     await claim(req.body, user.id);
-    await store.logEvent("signup", user.id);
+    await promoteIfSuper(user);
+    await store.logEvent("signup", user.id, null, (await currentStore(req) || {}).id);
     res.setHeader("Set-Cookie", auth.sessionCookie(user.id));
     res.json({ user: { id: user.id, email: user.email } });
   }));
@@ -94,7 +131,8 @@ function createApp(store = createStore()) {
       return res.status(401).json({ error: "И-мэйл эсвэл нууц үг буруу байна." });
     }
     await claim(req.body, user.id);
-    await store.logEvent("login", user.id);
+    await promoteIfSuper(user);
+    await store.logEvent("login", user.id, null, (await currentStore(req) || {}).id);
     res.setHeader("Set-Cookie", auth.sessionCookie(user.id));
     res.json({ user: { id: user.id, email: user.email } });
   }));
@@ -109,7 +147,7 @@ function createApp(store = createStore()) {
     const quota = await limits.remaining(store, { userId: user && user.id, ipHash: ipHash(req) });
     // Өмнөх тестийн хариулт — дахин бөглөхөд урьдчилан бөглөнө
     const lastInput = user ? await store.getLastInput(user.id) : null;
-    res.json({ user: user ? { id: user.id, email: user.email } : null, quota, lastInput });
+    res.json({ user: user ? { id: user.id, email: user.email, role: user.role, storeId: user.store_id } : null, quota, lastInput });
   }));
 
   // Бүртгэл болон бүх тайланг бүрмөсөн устгах (privacy)
@@ -145,21 +183,160 @@ function createApp(store = createStore()) {
     const key = `track:${ipHash(req)}:${limits.hourKey()}`;
     if ((await store.incrUsage(key, 1)) > 100) return res.status(429).json({ ok: false });
     const user = await currentUser(req);
-    await store.logEvent(name, user && user.id);
+    await store.logEvent(name, user && user.id, null, (await currentStore(req) || {}).id);
     res.json({ ok: true });
   }));
 
-  app.get("/api/admin/stats", wrap(async (req, res) => {
-    const given = String(req.headers.authorization || "").replace(/^Bearer /, "");
-    const ok = ADMIN_TOKEN && given.length === ADMIN_TOKEN.length &&
-      crypto.timingSafeEqual(Buffer.from(given), Buffer.from(ADMIN_TOKEN));
-    if (!ok) return res.status(401).json({ error: "unauthorized" });
-    const s = await store.stats(limits.ubDayStartIso());
+  // ---------- Админ ----------
+
+  async function statsFor(storeId) {
+    const s = await store.stats(limits.ubDayStartIso(), storeId);
     const costUsd = s.byModel.reduce((sum, m) => {
       const [pi, po] = PRICES[m.model] || [0, 0];
       return sum + (Number(m.input_tokens) * pi + Number(m.output_tokens) * po) / 1e6;
     }, 0);
-    res.json({ ...s, estimatedCostUsd: Math.round(costUsd * 100) / 100, limits: limits.LIMITS, model: MODEL });
+    return { ...s, estimatedCostUsd: Math.round(costUsd * 100) / 100, limits: limits.LIMITS, model: MODEL };
+  }
+
+  // ADMIN_TOKEN (скрипт, curl) → бүх систем. SUPER_ADMIN → бүх систем эсвэл ?store=<id>. STORE_ADMIN → зөвхөн өөрийн дэлгүүр.
+  app.get("/api/admin/stats", wrap(async (req, res) => {
+    const given = String(req.headers.authorization || "").replace(/^Bearer /, "");
+    const tokenOk = ADMIN_TOKEN && given.length === ADMIN_TOKEN.length &&
+      crypto.timingSafeEqual(Buffer.from(given), Buffer.from(ADMIN_TOKEN));
+    if (tokenOk) return res.json(await statsFor(null));
+    const user = await requireRole(req, res, [ROLES.SUPER_ADMIN, ROLES.STORE_ADMIN]);
+    if (!user) return;
+    if (user.role === ROLES.STORE_ADMIN) {
+      if (!user.store_id) return res.status(403).json({ error: "Танд дэлгүүр оноогоогүй байна." });
+      return res.json(await statsFor(user.store_id));
+    }
+    res.json(await statsFor(typeof req.query.store === "string" && req.query.store ? req.query.store : null));
+  }));
+
+  app.get("/api/admin/me", wrap(async (req, res) => {
+    const user = await requireRole(req, res, [ROLES.SUPER_ADMIN, ROLES.STORE_ADMIN]);
+    if (!user) return;
+    const st = user.store_id ? await store.getStoreById(user.store_id) : null;
+    res.json({ user: { id: user.id, email: user.email, role: user.role }, store: st });
+  }));
+
+  function readStoreFields(body, { partial }) {
+    const b = body || {};
+    const f = {};
+    if (!partial || b.slug !== undefined) {
+      const slug = String(b.slug || "").trim().toLowerCase();
+      if (!SLUG_RE.test(slug)) return { error: "Slug зөвхөн латин жижиг үсэг, тоо, зураас (2–40 тэмдэгт)." };
+      f.slug = slug;
+    }
+    if (!partial || b.name !== undefined) {
+      const name = String(b.name || "").trim();
+      if (!name || name.length > 80) return { error: "Дэлгүүрийн нэр 1–80 тэмдэгт." };
+      f.name = name;
+    }
+    if (b.accent !== undefined && b.accent !== null && b.accent !== "") {
+      if (!HEX_RE.test(b.accent)) return { error: "Өнгө #RRGGBB хэлбэртэй байна." };
+      f.accent = b.accent;
+    }
+    if (b.dailyCap !== undefined) {
+      const n = b.dailyCap === null || b.dailyCap === "" ? null : Number(b.dailyCap);
+      if (n !== null && !(Number.isInteger(n) && n >= 0 && n <= 100000)) return { error: "Өдрийн хязгаар 0–100000 бүхэл тоо." };
+      f.dailyCap = n;
+    }
+    if (b.active !== undefined) f.active = !!b.active;
+    return { f };
+  }
+
+  app.get("/api/admin/stores", wrap(async (req, res) => {
+    if (!(await requireRole(req, res, [ROLES.SUPER_ADMIN]))) return;
+    res.json({ stores: await store.listStores() });
+  }));
+
+  app.post("/api/admin/stores", wrap(async (req, res) => {
+    if (!(await requireRole(req, res, [ROLES.SUPER_ADMIN]))) return;
+    const { f, error } = readStoreFields(req.body, { partial: false });
+    if (error) return res.status(400).json({ error });
+    const row = await store.createStoreRow({ id: crypto.randomUUID(), ...f });
+    if (!row) return res.status(409).json({ error: "Энэ slug аль хэдийн ашиглагдсан байна." });
+    res.json({ store: row });
+  }));
+
+  // SUPER_ADMIN бүгдийг; STORE_ADMIN зөвхөн өөрийн дэлгүүрийн нэр, өнгийг засна
+  app.patch("/api/admin/stores/:id", wrap(async (req, res) => {
+    const user = await requireRole(req, res, [ROLES.SUPER_ADMIN, ROLES.STORE_ADMIN]);
+    if (!user) return;
+    const isSuper = user.role === ROLES.SUPER_ADMIN;
+    if (!isSuper && user.store_id !== req.params.id) return res.status(403).json({ error: "Эрх хүрэхгүй байна." });
+    const body = { ...(req.body || {}) };
+    delete body.slug; // slug-ийг өөрчлөхгүй — холбоосууд эвдэрнэ
+    if (!isSuper) { delete body.active; delete body.dailyCap; }
+    const { f, error } = readStoreFields(body, { partial: true });
+    if (error) return res.status(400).json({ error });
+    const row = await store.updateStore(req.params.id, f);
+    if (!row) return res.status(404).json({ error: "Дэлгүүр олдсонгүй." });
+    res.json({ store: row });
+  }));
+
+  app.get("/api/admin/stores/:id/admins", wrap(async (req, res) => {
+    const user = await requireRole(req, res, [ROLES.SUPER_ADMIN, ROLES.STORE_ADMIN]);
+    if (!user) return;
+    if (user.role !== ROLES.SUPER_ADMIN && user.store_id !== req.params.id) return res.status(403).json({ error: "Эрх хүрэхгүй байна." });
+    res.json({ admins: await store.listStoreAdmins(req.params.id) });
+  }));
+
+  // Бүртгэлтэй хэрэглэгчийг дэлгүүрийн админ болгох (SUPER_ADMIN)
+  app.post("/api/admin/stores/:id/admins", wrap(async (req, res) => {
+    if (!(await requireRole(req, res, [ROLES.SUPER_ADMIN]))) return;
+    const st = await store.getStoreById(req.params.id);
+    if (!st) return res.status(404).json({ error: "Дэлгүүр олдсонгүй." });
+    const email = String((req.body && req.body.email) || "").trim().toLowerCase();
+    const target = email && (await store.getUserByEmail(email));
+    if (!target) return res.status(404).json({ error: "Энэ и-мэйлтэй хэрэглэгч олдсонгүй. Эхлээд апп дээр бүртгүүлэх хэрэгтэй." });
+    if (target.role === ROLES.SUPER_ADMIN) return res.status(400).json({ error: "SUPER_ADMIN-ийг дэлгүүрийн админ болгохгүй." });
+    res.json({ admin: await store.setUserRole(target.id, ROLES.STORE_ADMIN, st.id) });
+  }));
+
+  app.delete("/api/admin/stores/:id/admins/:userId", wrap(async (req, res) => {
+    if (!(await requireRole(req, res, [ROLES.SUPER_ADMIN]))) return;
+    const target = await store.getUserById(req.params.userId);
+    if (!target || target.role !== ROLES.STORE_ADMIN || target.store_id !== req.params.id) {
+      return res.status(404).json({ error: "Энэ дэлгүүрийн админ олдсонгүй." });
+    }
+    await store.setUserRole(target.id, ROLES.USER, null);
+    res.json({ ok: true });
+  }));
+
+  // ---------- Дэлгүүрийн хуудас (/s/<slug>) ба PWA ----------
+
+  async function activeStoreBySlug(raw) {
+    const slug = String(raw || "").toLowerCase();
+    if (!SLUG_RE.test(slug)) return null;
+    const st = await store.getStoreBySlug(slug);
+    return st && st.active ? st : null;
+  }
+
+  app.get("/api/store/:slug", wrap(async (req, res) => {
+    const st = await activeStoreBySlug(req.params.slug);
+    if (!st) return res.status(404).json({ error: "Дэлгүүр олдсонгүй." });
+    res.json({ slug: st.slug, name: st.name, accent: st.accent });
+  }));
+
+  app.get("/s/:slug", wrap(async (req, res) => {
+    const st = await activeStoreBySlug(req.params.slug);
+    if (!st) return res.redirect("/");
+    res.type("html").send(INDEX_HTML.replace('href="/manifest.json"', `href="/s/${st.slug}/manifest.json"`));
+  }));
+
+  // Дэлгүүр бүр өөрийн нэрээр, өөрийн хуудсаар нээгддэг апп болж суулгагдана
+  app.get("/s/:slug/manifest.json", wrap(async (req, res) => {
+    const st = await activeStoreBySlug(req.params.slug);
+    if (!st) return res.status(404).json({ error: "not found" });
+    res.type("application/manifest+json").send(JSON.stringify({
+      ...BASE_MANIFEST,
+      id: `/s/${st.slug}`,
+      name: `${st.name} — MyStyle AI`,
+      short_name: st.name.slice(0, 12),
+      start_url: `/s/${st.slug}`,
+    }));
   }));
 
   // ---------- Стилийн тайлан гаргах ----------
@@ -173,6 +350,7 @@ function createApp(store = createStore()) {
     const user = await currentUser(req);
     const userId = user ? user.id : null;
     const ident = { userId, ipHash: ipHash(req) };
+    const shop = await currentStore(req);
     const { promptText, content, hasImages, hasPhoto, wardrobeCount } = buildContent(a);
     const input = { ...storableInput(a), hasPhoto, wardrobeCount };
 
@@ -183,13 +361,17 @@ function createApp(store = createStore()) {
     let usage = { input_tokens: 0, output_tokens: 0 };
 
     if (!report) {
-      const slot = await limits.reserve(store, limits.reportBuckets(ident));
+      const buckets = limits.reportBuckets(ident);
+      // Дэлгүүр тус бүрд өдрийн хязгаар тавьж болно (дэлгүүрийн төлбөрийн багцтай уялдуулахад)
+      if (shop && shop.daily_cap != null) buckets.push({ key: `store:${shop.id}:${limits.dayKey()}`, limit: shop.daily_cap, code: "store" });
+      const slot = await limits.reserve(store, buckets);
       if (!slot.ok) {
         const msg = {
           anon: "Өнөөдрийн үнэгүй тайлангаа ашигласан байна. Бүртгүүлбэл сард " + limits.LIMITS.userPerMonth + " тайлан үнэгүй авна.",
           user: "Энэ сарын үнэгүй тайлангийн хязгаар (" + limits.LIMITS.userPerMonth + ") дууссан байна.",
           ip: "Энэ сүлжээнээс өнөөдөр хэт олон тайлан гаргасан байна. Маргааш дахин оролдоно уу.",
           global: "Өнөөдөр хэрэглэгч их байгаа тул түр хязгаарласан. Маргааш дахин оролдоно уу.",
+          store: "Энэ дэлгүүрийн өнөөдрийн тайлангийн хязгаар дууссан. Маргааш дахин оролдоно уу.",
         }[slot.code];
         return res.status(429).json({ error: msg, code: slot.code });
       }
@@ -209,10 +391,10 @@ function createApp(store = createStore()) {
     const id = crypto.randomUUID();
     const claimToken = userId ? null : crypto.randomBytes(18).toString("base64url");
     await store.saveReport({
-      id, userId, claimToken, input, report, model: MODEL, cached,
+      id, userId, claimToken, input, report, model: MODEL, cached, storeId: shop && shop.id,
       inputTokens: usage.input_tokens || 0, outputTokens: usage.output_tokens || 0,
     });
-    console.log(JSON.stringify({ evt: "report", id, user: !!userId, cached, ...usage }));
+    console.log(JSON.stringify({ evt: "report", id, user: !!userId, store: shop && shop.slug, cached, ...usage }));
 
     const quota = await limits.remaining(store, ident);
     res.json({ report, id, saved: !!userId, claimToken, quota });
@@ -221,7 +403,7 @@ function createApp(store = createStore()) {
   return app;
 }
 
-async function callClaude(content) {
+async function callClaude(content, model = MODEL) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CLAUDE_TIMEOUT_MS);
   try {
@@ -233,7 +415,7 @@ async function callClaude(content) {
         "x-api-key": API_KEY,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify({ model: MODEL, max_tokens: MAX_TOKENS, messages: [{ role: "user", content }] }),
+      body: JSON.stringify({ model, max_tokens: MAX_TOKENS, messages: [{ role: "user", content }] }),
     });
     const data = await r.json();
     if (data.error) throw new Error("Anthropic error: " + JSON.stringify(data.error));
@@ -244,7 +426,7 @@ async function callClaude(content) {
     const s = text.indexOf("{"), e = text.lastIndexOf("}");
     if (s >= 0 && e >= 0) text = text.slice(s, e + 1);
 
-    return { report: JSON.parse(text), usage: data.usage || {} };
+    return { report: JSON.parse(text), usage: data.usage || {}, stopReason: data.stop_reason };
   } finally {
     clearTimeout(timeout);
   }
@@ -259,3 +441,5 @@ if (process.env.VERCEL !== "1" && require.main === module) {
 
 module.exports = app;
 module.exports.createApp = createApp;
+module.exports.callClaude = callClaude;
+module.exports.PRICES = PRICES;
