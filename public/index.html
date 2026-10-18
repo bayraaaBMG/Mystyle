@@ -135,6 +135,20 @@
   .sw{text-align:center;width:76px}
   .sw .chip{height:56px;border-radius:10px;border:1px solid rgba(0,0,0,.08);margin-bottom:7px}
   .sw .nm{font-size:11px;color:var(--muted);line-height:1.3}
+  .ongo-tovch{font-size:14px;color:var(--muted);margin-bottom:16px}
+  .cdetail{display:flex;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+  .cdetail .cd-chip{flex:none;width:44px;height:44px;border-radius:10px;border:1px solid rgba(0,0,0,.08)}
+  .cdetail .cd-name{font-weight:800;font-size:14px;margin-bottom:4px}
+  .cdetail .cd-name span{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+  .cdetail p{font-size:13.5px;line-height:1.5;margin-bottom:3px}
+  .cdetail b{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-dark);margin-right:4px}
+  .sizes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
+  @media(max-width:480px){.sizes{grid-template-columns:1fr}}
+  .size-box{border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:center}
+  .size-box .sb-l{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .size-box .sb-v{font-family:'Spectral',serif;font-weight:800;font-size:20px;line-height:1.2}
+  .fit-tag{display:inline-block;font-size:11px;font-weight:800;color:#fff;background:var(--ink);border-radius:100px;padding:2px 10px;margin-left:6px;vertical-align:1px}
+  .size-note{font-size:13px;color:var(--muted);margin-top:12px}
   .ocard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px}
   .ocard:last-child{margin-bottom:0}
   .ocard .o-h{font-weight:800;font-size:13px;color:var(--accent-dark);margin-bottom:5px}
@@ -170,15 +184,80 @@
   .loader p{color:var(--muted);font-family:'Spectral',serif;font-style:italic;font-size:18px}
   .foot{text-align:center;color:var(--muted);font-size:12px;padding:30px 0 50px;letter-spacing:.03em}
 
+  /* Top bar, account */
+  .topbar{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:16px 24px 0;max-width:760px;margin:0 auto;font-size:13px}
+  .topbar .who{color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tb-btn{appearance:none;background:none;border:1.5px solid var(--line);color:var(--ink);font-family:'Manrope';font-weight:700;font-size:13px;padding:7px 14px;border-radius:100px;cursor:pointer}
+  .tb-btn:hover{border-color:var(--ink)}
+  .tb-link{appearance:none;background:none;border:none;color:var(--muted);font-family:'Manrope';font-size:13px;cursor:pointer;text-decoration:underline}
+  .quota{font-size:13px;color:var(--muted);text-align:center;margin-top:12px}
+  .save-banner{background:var(--paper);border:1.5px solid var(--accent);border-radius:16px;padding:18px 20px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .save-banner p{flex:1;min-width:200px;font-size:14px}
+  .save-banner.done{border-color:var(--line);color:var(--muted)}
+  .cta.sm{padding:10px 20px;font-size:14px}
+
+  /* Modal */
+  .modal{position:fixed;inset:0;background:rgba(34,31,26,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+  .modal.open{display:flex}
+  .m-box{background:var(--paper);border-radius:20px;padding:26px 24px;width:100%;max-width:400px;max-height:90vh;overflow:auto;position:relative}
+  .m-box h3{font-family:'Spectral',serif;font-weight:800;font-size:22px;margin-bottom:6px}
+  .m-box .m-sub{font-size:13px;color:var(--muted);margin-bottom:18px}
+  .m-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted)}
+  .m-box input{width:100%;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:12px 14px;font-size:15px;font-family:'Manrope';color:var(--ink);outline:none;margin-bottom:10px}
+  .m-box .generate{margin-top:4px}
+  .m-switch{font-size:13px;text-align:center;margin-top:14px;color:var(--muted)}
+  .m-switch a,.m-legal a{color:var(--accent-dark);cursor:pointer}
+  .m-legal{font-size:11px;color:var(--muted);margin-top:12px;text-align:center}
+  .m-err{color:var(--accent-dark);font-size:13px;margin:4px 0 8px;display:none}
+  .rep-item{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer;background:#fff}
+  .rep-item:hover{border-color:var(--accent)}
+  .rep-item .ri-d{font-size:11px;color:var(--muted);margin-bottom:4px}
+  .rep-item .ri-t{font-size:13px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .m-danger{font-size:12px;color:var(--muted);margin-top:16px;text-align:center}
+  .m-danger a{color:var(--muted);cursor:pointer;text-decoration:underline}
+
   @media print{
     body{background:#fff}
-    .hero,.quiz,.loader,.foot,.actions,.premium .p-btn,.premium .p-note,.pricing{display:none!important}
+    .hero,.quiz,.loader,.foot,.actions,.premium .p-btn,.premium .p-note,.pricing,.topbar,.save-banner,.modal{display:none!important}
     .result{display:block!important;padding:0}
     .r-card.r-summary{background:#221F1A!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
 </style>
 </head>
 <body>
+
+<div class="topbar" id="topbar">
+  <span class="who" id="who"></span>
+  <button type="button" class="tb-btn" id="myreports" style="display:none">Миний тайлангууд</button>
+  <button type="button" class="tb-btn" id="login">Нэвтрэх</button>
+  <button type="button" class="tb-link" id="logout" style="display:none">Гарах</button>
+</div>
+
+<div class="modal" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+  <div class="m-box">
+    <button type="button" class="m-close" data-close>✕</button>
+    <h3 id="auth-title">Бүртгүүлэх</h3>
+    <p class="m-sub" id="auth-sub">Тайлангуудаа хадгалж, хүссэн үедээ эргэж үзээрэй.</p>
+    <form id="auth-form">
+      <input type="email" id="auth-email" placeholder="И-мэйл" autocomplete="email" required>
+      <input type="password" id="auth-pass" placeholder="Нууц үг (8+ тэмдэгт)" autocomplete="new-password" minlength="8" required>
+      <div class="m-err" id="auth-err"></div>
+      <button type="submit" class="generate" id="auth-submit">Бүртгүүлэх</button>
+    </form>
+    <div class="m-switch" id="auth-switch"></div>
+    <div class="m-legal">Үргэлжлүүлснээр <a href="/privacy.html" target="_blank">нууцлалын бодлого</a>-г зөвшөөрч байна.</div>
+  </div>
+</div>
+
+<div class="modal" id="reports-modal" role="dialog" aria-modal="true" aria-labelledby="rep-title">
+  <div class="m-box">
+    <button type="button" class="m-close" data-close>✕</button>
+    <h3 id="rep-title">Миний тайлангууд</h3>
+    <p class="m-sub" id="rep-sub"></p>
+    <div id="rep-list"></div>
+    <div class="m-danger"><a id="delete-account">Бүртгэл, бүх тайлангаа устгах</a></div>
+  </div>
+</div>
 
 <section class="hero">
   <div class="wrap">
@@ -269,6 +348,13 @@
       <div class="field"><label>Жин <span class="hint">(кг — заавал биш)</span></label><input type="number" id="weight" placeholder="жишээ нь: 65"></div>
     </div>
 
+    <div class="field" style="margin-bottom:8px"><label>Биеийн хэмжээ <span class="hint">(см — заавал биш, оруулбал размерийн зөвлөмж илүү нарийн болно)</span></label></div>
+    <div class="row">
+      <div class="field"><input type="number" id="chest" placeholder="Цээж"></div>
+      <div class="field"><input type="number" id="waist" placeholder="Бэлхүүс"></div>
+      <div class="field"><input type="number" id="hips" placeholder="Ташаа"></div>
+    </div>
+
     <div class="field">
       <label>Биеийн хэлбэр</label>
       <div class="opts" data-q="body">
@@ -287,7 +373,7 @@
       <label>Selfie зураг оруулах <span class="hint">(заавал биш — AI нүүрний хэлбэр, арьсны өнгийг өөрөө тодорхойлно)</span></label>
       <label class="upload" id="uplabel"><div class="u-ico">📷</div><div class="u-t">Зураг сонгох</div><div class="u-s">Нүүр тод харагдсан зураг · JPG/PNG</div><input type="file" id="selfie" accept="image/*"></label>
       <div class="preview" id="preview"><img id="pimg" alt=""><span class="rm" id="premove">Зураг устгах</span></div>
-      <div class="privacy-note">Таны зураг серверт <strong>хадгалагдахгүй</strong>. Зөвхөн AI шинжилгээнд нэг удаа ашиглагдаад шууд устгагдана. Бид таны нууцлалыг хүндэлнэ.</div>
+      <div class="privacy-note">Таны зураг серверт <strong>хадгалагдахгүй</strong>. Зөвхөн AI шинжилгээнд нэг удаа ашиглагдаад шууд устгагдана. Дэлгэрэнгүйг <a href="/privacy.html" target="_blank">нууцлалын бодлого</a>-оос үзнэ үү.</div>
     </div>
 
     <div class="field">
@@ -316,6 +402,7 @@
 
     <button type="button" class="generate" id="gen">Миний хувийн зөвлөгөөг гаргах →</button>
     <div class="err" id="err"></div>
+    <div class="quota" id="quota"></div>
   </div>
 </section>
 
@@ -323,6 +410,7 @@
 
 <section class="result" id="result">
   <div class="wrap">
+    <div id="save-slot"></div>
     <div class="r-cards" id="report"></div>
     <div class="actions">
       <button type="button" class="btn-line" id="pdf">⤓ PDF татах</button>
@@ -331,7 +419,7 @@
   </div>
 </section>
 
-<div class="foot">MyStyle AI · Зөвлөгөөг AI гаргасан тул эцсийн шийдвэр танайх.</div>
+<div class="foot">MyStyle AI · Зөвлөгөөг AI гаргасан тул эцсийн шийдвэр танайх. · <a href="/privacy.html" style="color:inherit">Нууцлалын бодлого</a></div>
 
 <script>
 (function(){
@@ -453,13 +541,144 @@
     "Хувийн тайланг нэгтгэж байна…"
   ];
 
+  // ---------- Бүртгэл, тайлан хадгалах, хязгаар ----------
+  let me=null, lastClaimToken=null, authMode='register';
+  const $=id=>document.getElementById(id);
+
+  async function api(path,opts){
+    const res=await fetch(path,Object.assign({headers:{"Content-Type":"application/json"}},opts||{}));
+    let data={}; try{ data=await res.json(); }catch(e){}
+    if(!res.ok) { const e=new Error(data.error||'алдаа'); e.status=res.status; e.data=data; throw e; }
+    return data;
+  }
+  function track(event){ fetch('/api/track',{method:'POST',headers:{"Content-Type":"application/json"},body:JSON.stringify({event})}).catch(()=>{}); }
+
+  function showQuota(q){
+    if(!q) return;
+    const per=q.period==='month'?'энэ сард':'өнөөдөр';
+    $('quota').innerHTML=q.left>0
+      ? per.charAt(0).toUpperCase()+per.slice(1)+' '+q.left+' үнэгүй тайлан үлдсэн'+(me?'':' · <a href="#" id="q-signup" style="color:var(--accent-dark)">бүртгүүлбэл илүү</a>')
+      : (me?'Энэ сарын үнэгүй тайлан дууссан.':'Өнөөдрийн үнэгүй тайлан дууссан. <a href="#" id="q-signup" style="color:var(--accent-dark)">Бүртгүүлээд үргэлжлүүл</a>');
+    const qs=$('q-signup'); if(qs) qs.addEventListener('click',e=>{e.preventDefault(); openAuth('register');});
+  }
+
+  async function refreshMe(){
+    try{
+      const d=await api('/api/me');
+      me=d.user;
+      $('who').textContent=me?me.email:'';
+      $('login').style.display=me?'none':'';
+      $('logout').style.display=me?'':'none';
+      $('myreports').style.display=me?'':'none';
+      showQuota(d.quota);
+      if(d.lastInput) prefill(d.lastInput);
+    }catch(e){ console.error(e); }
+  }
+
+  // Өмнөх хариултаар бөглөнө — хэрэглэгч аль хэдийн бөглөж эхэлсэн бол хүрэхгүй
+  function prefill(inp){
+    if(Object.keys(answers).length||$('height').value) return;
+    document.querySelectorAll('.opts').forEach(group=>{
+      const v=inp[group.dataset.q]; if(!v) return;
+      group.querySelectorAll('.opt').forEach(o=>{
+        if(o.textContent.trim()===v){ o.classList.add('sel'); answers[group.dataset.q]=v; }
+      });
+    });
+    ['height','weight','chest','waist','hips'].forEach(k=>{ if(inp[k]) $(k).value=inp[k]; });
+    $('quiz').querySelector('.sub').textContent='Өмнөх хариултаар бөглөсөн байна — өөрчлөх зүйлээ засаад дахин гаргаарай.';
+  }
+
+  function openModal(id){ $(id).classList.add('open'); }
+  function closeModal(id){ $(id).classList.remove('open'); }
+  document.querySelectorAll('.modal').forEach(m=>{
+    m.addEventListener('click',e=>{ if(e.target===m||e.target.hasAttribute('data-close')) m.classList.remove('open'); });
+  });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal.open').forEach(m=>m.classList.remove('open')); });
+
+  function setAuthMode(mode){
+    authMode=mode;
+    const reg=mode==='register';
+    $('auth-title').textContent=reg?'Бүртгүүлэх':'Нэвтрэх';
+    $('auth-submit').textContent=reg?'Бүртгүүлэх':'Нэвтрэх';
+    $('auth-pass').autocomplete=reg?'new-password':'current-password';
+    $('auth-switch').innerHTML=reg?'Бүртгэлтэй юу? <a id="sw">Нэвтрэх</a>':'Бүртгэлгүй юу? <a id="sw">Бүртгүүлэх</a>';
+    $('sw').addEventListener('click',()=>setAuthMode(reg?'login':'register'));
+    $('auth-err').style.display='none';
+  }
+  function openAuth(mode,sub){
+    setAuthMode(mode);
+    $('auth-sub').textContent=sub||'Тайлангуудаа хадгалж, хүссэн үедээ эргэж үзээрэй.';
+    openModal('auth-modal'); $('auth-email').focus();
+  }
+
+  $('login').addEventListener('click',()=>openAuth('login'));
+  $('logout').addEventListener('click',async()=>{ await api('/api/auth/logout',{method:'POST'}).catch(()=>{}); lastClaimToken=null; refreshMe(); });
+
+  $('auth-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=$('auth-submit'); btn.disabled=true;
+    try{
+      await api('/api/auth/'+authMode,{method:'POST',body:JSON.stringify({email:$('auth-email').value,password:$('auth-pass').value,claimToken:lastClaimToken})});
+      closeModal('auth-modal'); $('auth-pass').value='';
+      if(lastClaimToken){ lastClaimToken=null; markSaved(); }
+      refreshMe();
+    }catch(ex){
+      $('auth-err').textContent=ex.message; $('auth-err').style.display='block';
+    }finally{ btn.disabled=false; }
+  });
+
+  function fmtDate(iso){ const d=new Date(iso); return d.toLocaleDateString('mn-MN')+' '+d.toTimeString().slice(0,5); }
+
+  $('myreports').addEventListener('click',async()=>{
+    openModal('reports-modal');
+    $('rep-list').innerHTML='<p class="m-sub">Ачаалж байна…</p>';
+    try{
+      const d=await api('/api/reports');
+      $('rep-sub').textContent=d.reports.length?d.reports.length+' тайлан хадгалагдсан':'';
+      $('rep-list').innerHTML=d.reports.length? d.reports.map(r=>
+        '<div class="rep-item" data-id="'+esc(r.id)+'"><div class="ri-d">'+esc(fmtDate(r.created_at))+(r.occasion?' · '+esc(r.occasion):'')+(r.style?' · '+esc(r.style):'')+'</div><div class="ri-t">'+esc(r.tovch||'')+'</div></div>'
+      ).join('') : '<p class="m-sub">Одоогоор хадгалсан тайлан алга. Тест бөглөөд эхний тайлангаа гаргаарай.</p>';
+      $('rep-list').querySelectorAll('.rep-item').forEach(el=>el.addEventListener('click',()=>openReport(el.dataset.id)));
+    }catch(ex){ $('rep-list').innerHTML='<p class="m-err" style="display:block">'+esc(ex.message)+'</p>'; }
+  });
+
+  async function openReport(id){
+    try{
+      const d=await api('/api/reports/'+encodeURIComponent(id));
+      closeModal('reports-modal');
+      lastSentWardrobe=[]; // зургийг хадгалдаггүй
+      $('quiz').style.display='none';
+      render(d.report,{saved:true,date:d.created_at});
+      track('report_view');
+    }catch(ex){ alert(ex.message); }
+  }
+
+  $('delete-account').addEventListener('click',async()=>{
+    if(!confirm('Бүртгэл болон бүх хадгалсан тайлан бүрмөсөн устна. Итгэлтэй байна уу?')) return;
+    try{ await api('/api/me',{method:'DELETE'}); closeModal('reports-modal'); refreshMe(); }
+    catch(ex){ alert(ex.message); }
+  });
+
+  function markSaved(){
+    $('save-slot').innerHTML='<div class="save-banner done"><p>✓ Тайлан таны бүртгэлд хадгалагдлаа. «Миний тайлангууд»-аас хүссэн үедээ үзнэ.</p></div>';
+  }
+  function saveBanner(opts){
+    if(opts.date){ $('save-slot').innerHTML='<div class="save-banner done"><p>Хадгалсан тайлан · '+esc(fmtDate(opts.date))+'</p></div>'; return; }
+    if(opts.saved){ markSaved(); return; }
+    $('save-slot').innerHTML='<div class="save-banner"><p><strong>Тайлангаа хадгалах уу?</strong> Бүртгүүлбэл энэ тайлан хадгалагдаж, дараа эргэж үзэх, шинэ улиралд дахин гаргах боломжтой.</p><button type="button" class="cta sm" id="save-signup">Бүртгүүлж хадгалах</button></div>';
+    $('save-signup').addEventListener('click',()=>openAuth('register','Бүртгүүлмэгц энэ тайлан таны бүртгэлд хадгалагдана.'));
+  }
+
+  refreshMe();
+
   document.getElementById('gen').addEventListener('click',generate);
   document.getElementById('again').addEventListener('click',()=>{
+    track('again_click');
     document.getElementById('result').style.display='none';
     document.getElementById('quiz').style.display='block';
     document.getElementById('quiz').scrollIntoView({behavior:'smooth'});
   });
-  document.getElementById('pdf').addEventListener('click',()=>window.print());
+  document.getElementById('pdf').addEventListener('click',()=>{ track('pdf_click'); window.print(); });
 
   function ubSeason(){
     const m=new Date().getMonth()+1;
@@ -485,6 +704,7 @@
     const payload={
       gender:answers.gender, height:document.getElementById('height').value,
       weight:document.getElementById('weight').value, body:answers.body,
+      chest:$('chest').value, waist:$('waist').value, hips:$('hips').value,
       face:answers.face, skin:answers.skin, undertone:answers.undertone,
       style:answers.style, occasion:answers.occasion, season:ubSeason(),
       selfie: selfieB64 ? {b64:selfieB64, mime:selfieMime} : null,
@@ -492,19 +712,21 @@
     };
 
     try{
-      const res=await fetch("/api/style",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
-      const data=await res.json();
-      if(!res.ok||data.error) throw new Error(data.error||"алдаа");
-      render(data);
+      const data=await api("/api/style",{method:"POST",body:JSON.stringify(payload)});
+      lastClaimToken=data.claimToken||null;
+      showQuota(data.quota);
+      render(data.report,{saved:data.saved});
     }catch(ex){
       console.error(ex);
-      err.textContent="Зөвлөгөө гаргахад алдаа гарлаа. Дахин оролдоно уу.";
+      err.textContent=ex.status===429? ex.message : "Зөвлөгөө гаргахад алдаа гарлаа. Дахин оролдоно уу.";
+      if(ex.status===429 && !me && ex.data && ex.data.code==='anon') openAuth('register','Бүртгүүлбэл сар бүр үнэгүй тайлан авч, хадгалах боломжтой.');
       document.getElementById('quiz').style.display='block'; err.style.display='block';
     }finally{
       clearInterval(timer); loader.style.display='none'; btn.disabled=false;
     }
   }
 
+  function hex(h){ return /^#[0-9a-fA-F]{3,8}$/.test(h||'')?h:'transparent'; }
   function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
   function liList(arr,cls){return '<ul class="list '+(cls||'')+'">'+(arr||[]).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';}
   function oCard(h,d){return '<div class="ocard"><div class="o-h">'+esc(h)+'</div><p>'+esc(d)+'</p></div>';}
@@ -514,8 +736,29 @@
     return w ? w.dataUrl : '';
   }
 
-  function render(r){
-    const sw=(r.ongo||[]).map(c=>'<div class="sw"><div class="chip" style="background:'+esc(c.hex)+'"></div><div class="nm">'+esc(c.ner)+'<br>'+esc(c.hex)+'</div></div>').join('');
+  function render(r,opts){
+    saveBanner(opts||{});
+    const cdetails=(r.ongo||[]).filter(c=>c.yagaad||c.ilerhiilel||c.setgegdel).map(c=>
+      '<div class="cdetail"><div class="cd-chip" style="background:'+hex(c.hex)+'"></div><div>'+
+        '<div class="cd-name">'+esc(c.ner)+'<span>'+esc(c.hex)+'</span></div>'+
+        (c.yagaad?'<p><b>Яагаад</b>'+esc(c.yagaad)+'</p>':'')+
+        (c.ilerhiilel?'<p><b>Харагдах байдал</b>'+esc(c.ilerhiilel)+'</p>':'')+
+        (c.setgegdel?'<p><b>Сэтгэгдэл</b>'+esc(c.setgegdel)+'</p>':'')+
+      '</div></div>').join('');
+    const z=r.razmer;
+    const sizeCard=z?
+      '<div class="r-card">'+
+        '<div class="r-card-head"><span class="rh-ico">📏</span>Размер &amp; Загвар</div>'+
+        '<div class="sizes">'+
+          [['Ерөнхий',z.useg],['Дээд хувцас',z.deed],['Өмд / юбка',z.dood]].filter(x=>x[1]).map(x=>
+            '<div class="size-box"><div class="sb-l">'+x[0]+'</div><div class="sb-v">'+esc(x[1])+'</div></div>').join('')+
+        '</div>'+
+        (z.brand?'<p class="size-note">'+esc(z.brand)+'</p>':'')+
+        ((z.zagvar||[]).length?'<div class="r-sub" style="margin-top:20px">Тохирох загвар (fit)</div>'+
+          (z.zagvar||[]).map(f=>'<div class="ocard"><div class="o-h">'+esc(f.turul)+(f.fit?'<span class="fit-tag">'+esc(f.fit)+'</span>':'')+'</div><p>'+esc(f.yagaad)+'</p></div>').join(''):'')+
+        (z.hemjih?'<p class="size-note">📐 '+esc(z.hemjih)+'</p>':'')+
+      '</div>' : '';
+    const sw=(r.ongo||[]).map(c=>'<div class="sw"><div class="chip" style="background:'+hex(c.hex)+'"></div><div class="nm">'+esc(c.ner)+'<br>'+esc(c.hex)+'</div></div>').join('');
     const outfits=(r.outfit||[]).map(o=>oCard(o.nohtsol,o.tailbar)).join('');
     const shopping=(r.shopping||[]).map(s=>oCard(s.zuil,s.yagaad)).join('');
     const delguurHtml=(r.delguur||[]).map(d=>oCard(d.ner,d.turul)).join('');
@@ -523,8 +766,8 @@
       '<div class="r-today"><div class="t-h">Өнөөдөр Улаанбаатарт</div><div class="t-w">'+esc(r.udur.tsag_agaar)+'</div><div class="t-p">'+esc(r.udur.sanal)+'</div></div>':'';
 
     const witems=(r.wardrobe||[]).map(it=>{
-      const src=wThumbSrc(it.index); if(!src) return '';
-      return '<div class="wi-item"><img src="'+src+'" alt=""><div class="wi-tag">'+esc(it.torol)+'</div><div class="wi-d">'+esc(it.ongo||'')+(it.tailbar?' · '+esc(it.tailbar):'')+'</div></div>';
+      const src=wThumbSrc(it.index);
+      return '<div class="wi-item">'+(src?'<img src="'+src+'" alt="">':'')+'<div class="wi-tag">'+esc(it.torol)+'</div><div class="wi-d">'+esc(it.ongo||'')+(it.tailbar?' · '+esc(it.tailbar):'')+'</div></div>';
     }).join('');
     const woutfits=(r.wardrobe_outfit||[]).map(o=>{
       const imgs=(o.indexuud||[]).map(i=>{const s=wThumbSrc(i); return s?'<img src="'+s+'" alt="">':'';}).join('');
@@ -560,9 +803,13 @@
       '<div class="r-card">'+
         '<div class="r-card-head"><span class="rh-ico">🎨</span>Өнгө &amp; Үс</div>'+
         '<div class="r-sub">Өнгөний palette</div>'+
+        (r.ongo_tovch?'<p class="ongo-tovch">'+esc(r.ongo_tovch)+'</p>':'')+
         '<div class="palette">'+sw+'</div>'+
+        (cdetails?'<div class="r-sub" style="margin-top:22px">Өнгө бүр танд юу өгөх вэ</div>'+cdetails:'')+
         '<div class="r-sub" style="margin-top:22px">Үсний засалт</div>'+liList(r.us)+
       '</div>'+
+
+      sizeCard+
 
       // Card 4 — Outfit санаа
       '<div class="r-card">'+
@@ -607,6 +854,7 @@
       '</div>';
 
     document.getElementById('unlock').addEventListener('click',()=>{
+      track('premium_click');
       document.getElementById('premium').style.display='none';
       document.getElementById('unlocked').style.display='block';
     });
