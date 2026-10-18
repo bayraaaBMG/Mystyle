@@ -7,89 +7,219 @@ try { process.loadEnvFile(); } catch (e) { /* .env байхгүй эсвэл х�
 
 const express = require("express");
 const path = require("path");
-
-const app = express();
-app.use(express.json({ limit: "30mb" })); // selfie + олон хувцасны зураг багтаахаар лимит өндөр
-app.use(express.static(path.join(__dirname, "public")));
+const crypto = require("crypto");
+const auth = require("./lib/auth");
+const limits = require("./lib/limits");
+const { createStore } = require("./lib/store");
+const { buildContent, storableInput } = require("./lib/prompt");
 
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.MYSTYLE_MODEL || "claude-sonnet-4-6";
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
-// Стилийн тайлан гаргах endpoint
-app.post("/api/style", async (req, res) => {
-  if (!API_KEY) {
-    return res.status(500).json({ error: "Серверт ANTHROPIC_API_KEY тохируулаагүй байна." });
+// $ / 1M token (input, output) — /api/admin/stats дээрх зардлын тооцоонд
+const PRICES = {
+  "claude-sonnet-4-6": [3, 15],
+  "claude-sonnet-5-5": [2, 10],
+  "claude-haiku-5-5": [0.1, 0.5],
+  "claude-haiku-4-5": [1, 5],
+  "claude-haiku-4-5-20251001": [1, 5],
+};
+
+const TRACKABLE = new Set(["premium_click", "pdf_click", "again_click", "report_view", "pricing_click"]);
+
+function createApp(store = createStore()) {
+  const app = express();
+  // Vercel/Render proxy-ийн ард бодит IP-г X-Forwarded-For-оос авна
+  app.set("trust proxy", process.env.VERCEL === "1" || process.env.TRUST_PROXY === "1");
+  app.use(express.json({ limit: "30mb" })); // selfie + олон хувцасны зураг багтаахаар лимит өндөр
+  app.use(express.static(path.join(__dirname, "public")));
+
+  const ipHash = (req) => auth.hashIp(req.ip);
+  const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
+    console.error(err);
+    res.status(500).json({ error: "Серверийн алдаа. Дахин оролдоно уу." });
+  });
+
+  async function currentUser(req) {
+    const id = auth.userIdFromRequest(req);
+    return id ? store.getUserById(id) : null;
   }
 
-  const a = req.body || {};
-  const season = a.season || "тодорхойгүй улирал";
-  const hasPhoto = a.selfie && a.selfie.b64;
-  const wardrobe = Array.isArray(a.wardrobe) ? a.wardrobe.filter((w) => w && w.b64).slice(0, 20) : [];
-  const hasWardrobe = wardrobe.length > 0;
-
-  const profile = `Хүйс: ${a.gender || "?"}
-Өндөр: ${a.height || "?"} см, Жин: ${a.weight || "хэлээгүй"} кг
-Биеийн хэлбэр: ${a.body || "?"}
-Нүүрний хэлбэр: ${hasPhoto ? "(selfie зургаас тодорхойл)" : (a.face || "хэлээгүй")}
-Арьсны өнгө: ${a.skin || "хэлээгүй"}, Өнгөлөг: ${a.undertone || "хэлээгүй"}
-Дуртай стиль: ${a.style || "хэлээгүй"}
-Нөхцөл: ${a.occasion || "?"}
-Байршил: Улаанбаатар. Одоогийн улирал: ${season}`;
-
-  const wardrobeNote = hasWardrobe
-    ? ` Хавсаргасан "Хувцасны зураг #N" гэж тэмдэглэсэн ${wardrobe.length} зураг бол хэрэглэгчийн өөрийнх нь эзэмшдэг хувцас, гутал, аксессуар юм. Зураг бүрийг тус тусад нь ажиглаж, тухайн зурагны дугаарыг ("index") ашиглан төрөл (жишээ нь цамц, футболк, өмд, юбка, куртка, гутал, цүнх гэх мэт), үндсэн өнгө, материал/стилийг тодорхойл. Дараа нь ЗӨВХӨН эдгээр бодит хувцаснуудыг ашиглан (шинэ хувцас зохиомлоор нэмэхгүйгээр) хэрэглэгчийн нөхцөл, улиралд тохирсон бодит хослол (look) санал болго. Хослол бүрд аль зурагнуудыг ашигласнаа "indexuud" массивт дугаарлаж бич.`
-    : "";
-
-  const promptText = `Чи бол туршлагатай, эелдэг хувийн стилист. Доорх хүний мэдээлэлд тулгуурлан Монгол хэлээр хувийн стилийн зөвлөгөө гаргана уу.${hasPhoto ? " Хавсаргасан selfie зургаас нүүрний хэлбэр болон арьсны өнгөлгийг ажиглан тооцоонд аваарай." : ""}${wardrobeNote}
-
-ЧУХАЛ ДҮРЭМ:
-- Эерэг, өөртөө итгэлтэй болгох өнгө аяс. "Туранхай харагдуул", "доголдлоо нуу" гэх мэт сөрөг үг ХЭРЭГЛЭХГҮЙ. "Юу нь чамд илүү зохимжтой, тав тухтай харагдана" гэсэн өнцгөөр бич.
-- Бодит, хэрэгжүүлж болохуйц зөвлөгөө. Ерөнхий үг бүү хэл.
-- Өндөр, жингийн тоог ашиглан биеийн пропорцид тохирсон нарийвчилсан зөвлөгөө өг.
-- Зөвхөн доорх JSON форматаар, өөр юм бичихгүйгээр (markdown, тайлбар, код блок ашиглахгүй) хариул.
-
-Хүний мэдээлэл:
-${profile}
-
-JSON бүтэц:
-{
-  "tovch":"2-3 өгүүлбэр эерэг танилцуулга, давуу талыг онцолсон",
-  "udur":{"tsag_agaar":"${season} гэдгийг товч дурдсан","sanal":"өнөөдөр УБ-д өмсөхөд тохирох бүрэн хослолын санал, улиралд тохирсон"},
-  "siluet":["тохирох хэлбэр/silhouette талаар 3-4 тодорхой зөвлөгөө"],
-  "songoh":["илүү зохимжтой, нөхцөлд (${a.occasion}) тохирсон 2-3 зөвлөгөө"],
-  "bolgoomj":["эерэгээр бичсэн, заавал биш гэдгийг сануулсан 2-3 зөвлөгөө"],
-  "ongo":[{"ner":"өнгөний нэр","hex":"#XXXXXX"}],
-  "us":["нүүрний хэлбэрт тохирох үсний засалтын 2-3 зөвлөгөө"],
-  "outfit":[{"nohtsol":"нөхцөл","tailbar":"бүрэн хослолын тайлбар"}],
-  "shopping":[{"zuil":"авбал зохих хувцасны төрөл","yagaad":"яагаад тохирохыг товч"}],
-  "gutal":["биеийн хэлбэр, нөхцөлд тохирох гутлын зөвлөгөө"],
-  "accessor":["нүүрний хэлбэр, стильд тохирох чихэвч, цүнх, аксессуарын зөвлөгөө"],
-  "goo":["арьсны өнгөлөг, нүүрний онцлогт тохирох будалтын өнгө, хэлбэрийн зөвлөгөө"],
-  "uliral":["одоогийн улиралд давхарлах, wardrobe-оо бэлтгэх зөвлөгөө"],
-  "delguur":[{"ner":"Монголд байдаг дэлгүүр буюу зах зээлийн нэр","turul":"ямар хэрэгцээнд, ямар хувцас авахад тохиромжтой"}],
-  "wardrobe":[{"index":"Хувцасны зураг #N дэх N тоо","torol":"хувцасны төрөл (жишээ нь цамц, өмд, гутал)","ongo":"үндсэн өнгө","tailbar":"материал/стилийн 3-5 үгэн тайлбар"}],
-  "wardrobe_outfit":[{"nohtsol":"ямар үед өмсөхөд тохирох","indexuud":[ашигласан зурагны дугаарууд],"tailbar":"хослолын тайлбар, дутуу зүйл байвал юу нэмж авбал сайжрахыг товч дурд"}]
-}
-ongo дотор яг 6 өнгө, outfit дотор 2-3, shopping болон delguur дотор 3, gutal/accessor/goo/uliral дотор 2-3 зүйл байг. ${hasWardrobe ? "wardrobe массивт хавсаргасан хувцасны зураг тус бүрд яг нэг элемент байх ёстой (нийт " + wardrobe.length + " ширхэг), wardrobe_outfit дотор боломжит хослолын тоогоор (ихдээ 5) бич." : "Хувцасны зураг ирээгүй тул wardrobe болон wardrobe_outfit-ийг хоосон массив ([]) байлга."}`;
-
-  let content;
-  if (hasPhoto || hasWardrobe) {
-    content = [];
-    if (hasPhoto) {
-      content.push({ type: "image", source: { type: "base64", media_type: a.selfie.mime || "image/jpeg", data: a.selfie.b64 } });
+  async function authThrottle(req, res) {
+    const key = `auth:${ipHash(req)}:${limits.hourKey()}`;
+    if ((await store.incrUsage(key, 1)) > limits.LIMITS.authPerHour) {
+      res.status(429).json({ error: "Хэт олон оролдлого. Түр хүлээгээд дахин оролдоно уу." });
+      return false;
     }
-    wardrobe.forEach((w, i) => {
-      content.push({ type: "text", text: `Хувцасны зураг #${i + 1}:` });
-      content.push({ type: "image", source: { type: "base64", media_type: w.mime || "image/jpeg", data: w.b64 } });
-    });
-    content.push({ type: "text", text: promptText });
-  } else {
-    content = promptText;
+    return true;
   }
 
+  function readCredentials(body) {
+    const email = String((body && body.email) || "").trim().toLowerCase();
+    const password = String((body && body.password) || "");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) return { error: "И-мэйл хаяг буруу байна." };
+    if (password.length < 8 || password.length > 200) return { error: "Нууц үг хамгийн багадаа 8 тэмдэгт байна." };
+    return { email, password };
+  }
+
+  // Нэвтрэхээс өмнө гаргасан тайланг шинэ/нэвтэрсэн хэрэглэгчид холбоно
+  async function claim(body, userId) {
+    const token = body && typeof body.claimToken === "string" ? body.claimToken : null;
+    return token ? store.claimReport(token, userId) : null;
+  }
+
+  // ---------- Бүртгэл / нэвтрэлт ----------
+
+  app.post("/api/auth/register", wrap(async (req, res) => {
+    if (!(await authThrottle(req, res))) return;
+    const c = readCredentials(req.body);
+    if (c.error) return res.status(400).json({ error: c.error });
+    const user = await store.createUser(crypto.randomUUID(), c.email, auth.hashPassword(c.password));
+    if (!user) return res.status(409).json({ error: "Энэ и-мэйлээр бүртгэл аль хэдийн байна. Нэвтэрнэ үү." });
+    await claim(req.body, user.id);
+    await store.logEvent("signup", user.id);
+    res.setHeader("Set-Cookie", auth.sessionCookie(user.id));
+    res.json({ user: { id: user.id, email: user.email } });
+  }));
+
+  app.post("/api/auth/login", wrap(async (req, res) => {
+    if (!(await authThrottle(req, res))) return;
+    const c = readCredentials(req.body);
+    const user = !c.error && (await store.getUserByEmail(c.email));
+    if (!user || !auth.verifyPassword(c.password, user.pass_hash)) {
+      return res.status(401).json({ error: "И-мэйл эсвэл нууц үг буруу байна." });
+    }
+    await claim(req.body, user.id);
+    await store.logEvent("login", user.id);
+    res.setHeader("Set-Cookie", auth.sessionCookie(user.id));
+    res.json({ user: { id: user.id, email: user.email } });
+  }));
+
+  app.post("/api/auth/logout", (req, res) => {
+    res.setHeader("Set-Cookie", auth.clearCookie());
+    res.json({ ok: true });
+  });
+
+  app.get("/api/me", wrap(async (req, res) => {
+    const user = await currentUser(req);
+    const quota = await limits.remaining(store, { userId: user && user.id, ipHash: ipHash(req) });
+    res.json({ user: user ? { id: user.id, email: user.email } : null, quota });
+  }));
+
+  // Бүртгэл болон бүх тайланг бүрмөсөн устгах (privacy)
+  app.delete("/api/me", wrap(async (req, res) => {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: "Нэвтрээгүй байна." });
+    await store.deleteUser(user.id);
+    res.setHeader("Set-Cookie", auth.clearCookie());
+    res.json({ ok: true });
+  }));
+
+  // ---------- Хадгалсан тайлангууд ----------
+
+  app.get("/api/reports", wrap(async (req, res) => {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: "Нэвтрээгүй байна." });
+    res.json({ reports: await store.listReports(user.id) });
+  }));
+
+  app.get("/api/reports/:id", wrap(async (req, res) => {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: "Нэвтрээгүй байна." });
+    const r = await store.getReport(req.params.id, user.id);
+    if (!r) return res.status(404).json({ error: "Тайлан олдсонгүй." });
+    res.json(r);
+  }));
+
+  // ---------- Хэрэглээ хэмжих ----------
+
+  app.post("/api/track", wrap(async (req, res) => {
+    const name = req.body && req.body.event;
+    if (!TRACKABLE.has(name)) return res.status(400).json({ error: "unknown event" });
+    const key = `track:${ipHash(req)}:${limits.hourKey()}`;
+    if ((await store.incrUsage(key, 1)) > 100) return res.status(429).json({ ok: false });
+    const user = await currentUser(req);
+    await store.logEvent(name, user && user.id);
+    res.json({ ok: true });
+  }));
+
+  app.get("/api/admin/stats", wrap(async (req, res) => {
+    const given = String(req.headers.authorization || "").replace(/^Bearer /, "");
+    const ok = ADMIN_TOKEN && given.length === ADMIN_TOKEN.length &&
+      crypto.timingSafeEqual(Buffer.from(given), Buffer.from(ADMIN_TOKEN));
+    if (!ok) return res.status(401).json({ error: "unauthorized" });
+    const s = await store.stats(limits.ubDayStartIso());
+    const costUsd = s.byModel.reduce((sum, m) => {
+      const [pi, po] = PRICES[m.model] || [0, 0];
+      return sum + (Number(m.input_tokens) * pi + Number(m.output_tokens) * po) / 1e6;
+    }, 0);
+    res.json({ ...s, estimatedCostUsd: Math.round(costUsd * 100) / 100, limits: limits.LIMITS, model: MODEL });
+  }));
+
+  // ---------- Стилийн тайлан гаргах ----------
+
+  app.post("/api/style", wrap(async (req, res) => {
+    if (!API_KEY) {
+      return res.status(500).json({ error: "Серверт ANTHROPIC_API_KEY тохируулаагүй байна." });
+    }
+
+    const a = req.body || {};
+    const user = await currentUser(req);
+    const userId = user ? user.id : null;
+    const ident = { userId, ipHash: ipHash(req) };
+    const { promptText, content, hasImages, hasPhoto, wardrobeCount } = buildContent(a);
+    const input = { ...storableInput(a), hasPhoto, wardrobeCount };
+
+    // Ижил хариулттай, зураггүй хүсэлтэд өмнөх тайланг дахин ашиглана — Claude дуудахгүй, хязгаар хасахгүй
+    const cacheKey = hasImages ? null : crypto.createHash("sha256").update(MODEL + "\n" + promptText).digest("hex");
+    let report = cacheKey ? await store.getCache(cacheKey) : null;
+    const cached = !!report;
+    let usage = { input_tokens: 0, output_tokens: 0 };
+
+    if (!report) {
+      const slot = await limits.reserve(store, limits.reportBuckets(ident));
+      if (!slot.ok) {
+        const msg = {
+          anon: "Өнөөдрийн үнэгүй тайлангаа ашигласан байна. Бүртгүүлбэл сард " + limits.LIMITS.userPerMonth + " тайлан үнэгүй авна.",
+          user: "Энэ сарын үнэгүй тайлангийн хязгаар (" + limits.LIMITS.userPerMonth + ") дууссан байна.",
+          ip: "Энэ сүлжээнээс өнөөдөр хэт олон тайлан гаргасан байна. Маргааш дахин оролдоно уу.",
+          global: "Өнөөдөр хэрэглэгч их байгаа тул түр хязгаарласан. Маргааш дахин оролдоно уу.",
+        }[slot.code];
+        return res.status(429).json({ error: msg, code: slot.code });
+      }
+
+      try {
+        const result = await callClaude(content);
+        report = result.report;
+        usage = result.usage;
+      } catch (err) {
+        await slot.release();
+        console.error(err);
+        return res.status(502).json({ error: "AI зөвлөгөө гаргахад алдаа гарлаа." });
+      }
+      if (cacheKey) await store.setCache(cacheKey, report);
+    }
+
+    const id = crypto.randomUUID();
+    const claimToken = userId ? null : crypto.randomBytes(18).toString("base64url");
+    await store.saveReport({
+      id, userId, claimToken, input, report, model: MODEL, cached,
+      inputTokens: usage.input_tokens || 0, outputTokens: usage.output_tokens || 0,
+    });
+    console.log(JSON.stringify({ evt: "report", id, user: !!userId, cached, ...usage }));
+
+    const quota = await limits.remaining(store, ident);
+    res.json({ report, id, saved: !!userId, claimToken, quota });
+  }));
+
+  return app;
+}
+
+async function callClaude(content) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 55000);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 55000);
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       signal: controller.signal,
@@ -100,30 +230,26 @@ ongo дотор яг 6 өнгө, outfit дотор 2-3, shopping болон delg
       },
       body: JSON.stringify({ model: MODEL, max_tokens: 4000, messages: [{ role: "user", content }] }),
     });
-    clearTimeout(timeout);
-
     const data = await r.json();
-    if (data.error) {
-      console.error("Anthropic error:", data.error);
-      return res.status(502).json({ error: "AI зөвлөгөө гаргахад алдаа гарлаа." });
-    }
+    if (data.error) throw new Error("Anthropic error: " + JSON.stringify(data.error));
 
     let text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const s = text.indexOf("{"), e = text.lastIndexOf("}");
     if (s >= 0 && e >= 0) text = text.slice(s, e + 1);
 
-    const report = JSON.parse(text);
-    res.json(report);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Серверийн алдаа. Дахин оролдоно уу." });
+    return { report: JSON.parse(text), usage: data.usage || {} };
+  } finally {
+    clearTimeout(timeout);
   }
-});
+}
 
-if (process.env.VERCEL !== '1') {
+const app = createApp();
+
+if (process.env.VERCEL !== "1" && require.main === module) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => console.log(`MyStyle сервер аслаа: http://localhost:${PORT}`));
 }
 
 module.exports = app;
+module.exports.createApp = createApp;
