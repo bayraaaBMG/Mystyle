@@ -1,7 +1,7 @@
 // MyStyle service worker — апп шиг суулгах, интернэт тасарсан үед хуудсыг нээх.
 // /api/* хүсэлтийг хэзээ ч cache хийхгүй (хувийн мэдээлэл, тайлан, зураг).
 
-const VERSION = "mystyle-v1";
+const VERSION = "mystyle-v2";
 const SHELL = ["/", "/privacy.html", "/icon.svg", "/icon-192.png", "/manifest.json"];
 
 self.addEventListener("install", (e) => {

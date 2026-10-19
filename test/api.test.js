@@ -284,3 +284,90 @@ test("multi-tenant: дэлгүүр, роль, store_id, дэлгүүрийн х�
   assert.strictEqual((await call(`/api/admin/stores/${nomin.id}/admins/${shopUser.id}`, { method: "DELETE", cookie: boss })).status, 200);
   assert.strictEqual((await call("/api/admin/stats", { cookie: shopAdmin })).status, 403);
 });
+
+test("шүүгээ: prompt-д хувцасны үнэлгээ, 7 хоногийн төлөвлөгөө орно", () => {
+  const { buildContent } = require("../lib/prompt");
+  const img = { b64: "aGVsbG8=", mime: "image/jpeg" };
+  const withW = buildContent({ ...quiz("Ажил"), wardrobe: [img, img, img] });
+  assert.strictEqual(withW.wardrobeCount, 3);
+  assert.ok(withW.promptText.includes('"tohiroh":"маш сайн | сайн | дунд | бага"'));
+  assert.ok(withW.promptText.includes("wardrobe_week"));
+  assert.ok(withW.promptText.includes("яг 7 өдөр"));
+  assert.ok(withW.promptText.includes("(нийт 3 ширхэг)"));
+  const noW = buildContent(quiz("Ажил"));
+  assert.ok(noW.promptText.includes("wardrobe_week-ийг хоосон массив"));
+});
+
+test("try-on: профайл нөхнө, юу ч хадгалахгүй, тусдаа хязгаартай", async (t) => {
+  const prompts = [];
+  global.fetch = async (url, opts) => {
+    if (!String(url).startsWith("https://api.anthropic.com")) return realFetch(url, opts);
+    const content = JSON.parse(opts.body).messages[0].content;
+    const text = typeof content === "string" ? content : content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
+    const isTryon = text.includes("дэлгүүрт хувцас өмсөж туршиж");
+    if (isTryon) prompts.push({ text, maxTokens: JSON.parse(opts.body).max_tokens, images: content.filter((b) => b.type === "image").length });
+    const out = isTryon
+      ? '{"dun":"tohirno","garchig":"Танд зохиж байна","yagaad":["Өнгө тань дулаан undertone-д тохирно"],"oorchlolt":["Бор гуталтай хослуул"],"razmer":"Мөр яг таарч байна"}'
+      : '{"tovch":"Сайн байна","ongo":[{"ner":"Тоосго улаан","hex":"#B5482B"},{"ner":"Цөцгий","hex":"#F3E7C9"}]}';
+    return { json: async () => ({ content: [{ type: "text", text: out }], usage: { input_tokens: 800, output_tokens: 200 } }) };
+  };
+  const { server, call } = await startServer();
+  t.after(() => { server.closeAllConnections(); server.close(); global.fetch = realFetch; });
+  const photo = { b64: "aGVsbG8=", mime: "image/jpeg" };
+
+  // Зураггүй / буруу төрөл
+  assert.strictEqual((await call("/api/tryon", { method: "POST", body: {} })).status, 400);
+  assert.strictEqual((await call("/api/tryon", { method: "POST", body: { photo: { b64: "x", mime: "text/html" } } })).status, 400);
+
+  // Бүртгэлтэй хэрэглэгч эхлээд тест бөглөсөн
+  const reg = await call("/api/auth/register", { method: "POST", body: { email: "t@r.mn", password: "password1" } });
+  await call("/api/style", { method: "POST", cookie: reg.cookie, body: { ...quiz("Ажил"), body: "Цаг хэлбэр", undertone: "Дулаан" } });
+  const before = (await call("/api/reports", { cookie: reg.cookie })).data.reports.length;
+
+  // Одоо бөглөсөн стиль давамгайлж, бусдыг өмнөх тайлангаас нөхнө
+  let r = await call("/api/tryon", { method: "POST", cookie: reg.cookie, body: { photo, profile: { style: "Спорт" }, note: "M размер" } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.result.dun, "tohirno");
+  assert.strictEqual(r.data.usedPalette, true);
+  assert.ok(r.data.usedProfile.includes("body"));
+  const p = prompts[0];
+  assert.strictEqual(p.images, 1);
+  assert.strictEqual(p.maxTokens, 1500);
+  assert.ok(p.text.includes("Биеийн хэлбэр: Цаг хэлбэр"));
+  assert.ok(p.text.includes("Өнгөлөг: Дулаан"));
+  assert.ok(p.text.includes("Дуртай стиль: Спорт"));
+  assert.ok(p.text.includes("Тоосго улаан, Цөцгий"));
+  assert.ok(p.text.includes("«M размер»"));
+
+  // Тайлан нэмэгдээгүй, тайлангийн эрх хасагдаагүй
+  assert.strictEqual((await call("/api/reports", { cookie: reg.cookie })).data.reports.length, before);
+  const me = await call("/api/me", { cookie: reg.cookie });
+  assert.strictEqual(me.data.quota.left, 1);
+  assert.strictEqual(me.data.tryonQuota.left, 19);
+
+  // Нэвтрээгүй: өдөрт 3, дараа нь 429; тайлангийн эрх хэвээр
+  for (let i = 0; i < 3; i++) assert.strictEqual((await call("/api/tryon", { method: "POST", body: { photo } })).status, 200);
+  r = await call("/api/tryon", { method: "POST", body: { photo } });
+  assert.strictEqual(r.status, 429);
+  assert.strictEqual(r.data.code, "anon");
+  assert.strictEqual((await call("/api/me")).data.quota.left, 1);
+  assert.ok(prompts[1].text.includes("Биеийн хэлбэр: хэлээгүй"));
+});
+
+test("try-on: AI алдаа гарвал эрх буцна, үл мэдэгдэх дүгнэлт todorhoigui болно", async (t) => {
+  let fail = true;
+  global.fetch = async (url, opts) => {
+    if (!String(url).startsWith("https://api.anthropic.com")) return realFetch(url, opts);
+    if (fail) return { json: async () => ({ error: { type: "overloaded_error" } }) };
+    return { json: async () => ({ content: [{ type: "text", text: '{"dun":"maybe","garchig":"?"}' }], usage: {} }) };
+  };
+  const { server, call } = await startServer();
+  t.after(() => { server.closeAllConnections(); server.close(); global.fetch = realFetch; });
+  const photo = { b64: "aGVsbG8=", mime: "image/png" };
+
+  assert.strictEqual((await call("/api/tryon", { method: "POST", body: { photo } })).status, 502);
+  assert.strictEqual((await call("/api/me")).data.tryonQuota.left, 3);
+  fail = false;
+  const r = await call("/api/tryon", { method: "POST", body: { photo } });
+  assert.strictEqual(r.data.result.dun, "todorhoigui");
+});

@@ -12,13 +12,18 @@ const crypto = require("crypto");
 const auth = require("./lib/auth");
 const limits = require("./lib/limits");
 const { createStore } = require("./lib/store");
-const { buildContent, storableInput } = require("./lib/prompt");
+const { buildContent, storableInput, buildTryonContent, TRYON_VERDICTS } = require("./lib/prompt");
 
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.MYSTYLE_MODEL || "claude-sonnet-4-6";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 // Өнгөний тайлбар, размер нэмэгдсэн тул хариу урт — max_tokens болон хугацааг нэмсэн
 const MAX_TOKENS = Number(process.env.MAX_TOKENS) || 8000;
+// Шүүгээний зураг ирвэл хувцас бүрийн үнэлгээ + 7 хоногийн төлөвлөгөө нэмэгдэнэ
+const WARDROBE_MAX_TOKENS = Number(process.env.WARDROBE_MAX_TOKENS) || 12000;
+const TRYON_MAX_TOKENS = 1500;
+const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const MAX_TRYON_B64 = 7 * 1024 * 1024; // ~5MB зураг
 const CLAUDE_TIMEOUT_MS = Number(process.env.CLAUDE_TIMEOUT_MS) || 90000;
 
 // $ / 1M token (input, output) — /api/admin/stats дээрх зардлын тооцоонд
@@ -147,7 +152,8 @@ function createApp(store = createStore()) {
     const quota = await limits.remaining(store, { userId: user && user.id, ipHash: ipHash(req) });
     // Өмнөх тестийн хариулт — дахин бөглөхөд урьдчилан бөглөнө
     const lastInput = user ? await store.getLastInput(user.id) : null;
-    res.json({ user: user ? { id: user.id, email: user.email, role: user.role, storeId: user.store_id } : null, quota, lastInput });
+    const tryonQuota = await limits.tryonRemaining(store, { userId: user && user.id, ipHash: ipHash(req) });
+    res.json({ user: user ? { id: user.id, email: user.email, role: user.role, storeId: user.store_id } : null, quota, tryonQuota, lastInput });
   }));
 
   // Бүртгэл болон бүх тайланг бүрмөсөн устгах (privacy)
@@ -377,7 +383,7 @@ function createApp(store = createStore()) {
       }
 
       try {
-        const result = await callClaude(content);
+        const result = await callClaude(content, MODEL, wardrobeCount ? WARDROBE_MAX_TOKENS : MAX_TOKENS);
         report = result.report;
         usage = result.usage;
       } catch (err) {
@@ -400,10 +406,73 @@ function createApp(store = createStore()) {
     res.json({ report, id, saved: !!userId, claimToken, quota });
   }));
 
+  // ---------- Дэлгүүрт туршиж буй зургийн хурдан шалгалт ----------
+  // Зураг, хариу аль нь ч хадгалагдахгүй — зөвхөн хэрэглээний тоо (event) бичигдэнэ.
+
+  app.post("/api/tryon", wrap(async (req, res) => {
+    if (!API_KEY) {
+      return res.status(500).json({ error: "Серверт ANTHROPIC_API_KEY тохируулаагүй байна." });
+    }
+    const body = req.body || {};
+    const photo = body.photo || {};
+    const mime = String(photo.mime || "image/jpeg");
+    if (typeof photo.b64 !== "string" || !photo.b64 || !IMAGE_MIMES.has(mime)) {
+      return res.status(400).json({ error: "Туршиж буй зургаа оруулна уу." });
+    }
+    if (photo.b64.length > MAX_TRYON_B64) {
+      return res.status(413).json({ error: "Зураг хэт том байна. Жижиг зураг оруулна уу." });
+    }
+
+    const user = await currentUser(req);
+    const userId = user ? user.id : null;
+    const ident = { userId, ipHash: ipHash(req) };
+    const shop = await currentStore(req);
+
+    // Профайл: одоо бөглөсөн хариулт давамгайлж, дутууг нь өмнөх тайлангаас нөхнө
+    let saved = {}, palette = [];
+    if (userId) {
+      saved = (await store.getLastInput(userId)) || {};
+      const last = (await store.listReports(userId))[0];
+      const rep = last && (await store.getReport(last.id, userId));
+      palette = ((rep && rep.report && rep.report.ongo) || []).map((c) => String(c.ner || "").slice(0, 40)).filter(Boolean).slice(0, 6);
+    }
+    const profile = { ...saved, ...storableInput(body.profile || {}) };
+    delete profile.season;
+    const note = String(body.note || "").replace(/\s+/g, " ").trim().slice(0, 200);
+    const { content } = buildTryonContent({ b64: photo.b64, mime }, profile, palette, note);
+
+    const slot = await limits.reserve(store, limits.tryonBuckets(ident));
+    if (!slot.ok) {
+      const msg = {
+        anon: "Өнөөдрийн үнэгүй шалгалт (" + limits.LIMITS.tryonAnonPerDay + ") дууссан. Бүртгүүлбэл өдөрт " + limits.LIMITS.tryonUserPerDay + " удаа шалгана.",
+        user: "Өнөөдрийн шалгалтын хязгаар (" + limits.LIMITS.tryonUserPerDay + ") дууссан. Маргааш дахин оролдоно уу.",
+        ip: "Энэ сүлжээнээс өнөөдөр хэт олон шалгалт хийсэн байна. Маргааш дахин оролдоно уу.",
+        global: "Өнөөдөр хэрэглэгч их байгаа тул түр хязгаарласан. Маргааш дахин оролдоно уу.",
+      }[slot.code];
+      return res.status(429).json({ error: msg, code: slot.code });
+    }
+
+    let result, usage;
+    try {
+      ({ report: result, usage } = await callClaude(content, MODEL, TRYON_MAX_TOKENS));
+    } catch (err) {
+      await slot.release();
+      console.error(err);
+      return res.status(502).json({ error: "AI шалгалт хийхэд алдаа гарлаа. Дахин оролдоно уу." });
+    }
+    if (!TRYON_VERDICTS.includes(result.dun)) result.dun = "todorhoigui";
+
+    await store.logEvent("tryon", userId, { model: MODEL, input_tokens: usage.input_tokens || 0, output_tokens: usage.output_tokens || 0 }, shop && shop.id);
+    console.log(JSON.stringify({ evt: "tryon", user: !!userId, store: shop && shop.slug, dun: result.dun, ...usage }));
+
+    const usedProfile = ["body", "skin", "undertone", "style", "height"].filter((k) => profile[k]);
+    res.json({ result, usedProfile, usedPalette: palette.length > 0, quota: await limits.tryonRemaining(store, ident) });
+  }));
+
   return app;
 }
 
-async function callClaude(content, model = MODEL) {
+async function callClaude(content, model = MODEL, maxTokens = MAX_TOKENS) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CLAUDE_TIMEOUT_MS);
   try {
@@ -415,7 +484,7 @@ async function callClaude(content, model = MODEL) {
         "x-api-key": API_KEY,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify({ model, max_tokens: MAX_TOKENS, messages: [{ role: "user", content }] }),
+      body: JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: "user", content }] }),
     });
     const data = await r.json();
     if (data.error) throw new Error("Anthropic error: " + JSON.stringify(data.error));
