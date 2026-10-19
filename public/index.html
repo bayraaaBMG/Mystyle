@@ -203,7 +203,22 @@
   .t-result h3{font-family:'Spectral',serif;font-weight:800;font-size:21px;line-height:1.3;margin-bottom:4px}
   .t-result .t-item{font-size:13px;color:var(--muted);margin-bottom:6px}
   .t-loading{display:none;text-align:center;color:var(--muted);font-family:'Spectral',serif;font-style:italic;font-size:16px;margin-top:16px}
-  .hero-alt{display:block;margin:14px auto 0;background:none;border:none;color:var(--accent-dark);font-family:'Manrope';font-weight:700;font-size:14px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  /* Шинэ функцүүд — нүүр хуудас болон тайлангийн дараах алхам */
+  .newfeat{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:30px 0 0;text-align:left}
+  @media(max-width:580px){.newfeat{grid-template-columns:1fr}}
+  .nf{appearance:none;position:relative;display:block;width:100%;text-align:left;cursor:pointer;font-family:'Manrope';color:var(--ink);background:var(--paper);border:1.5px solid var(--accent);border-radius:18px;padding:18px 18px 16px;box-shadow:0 12px 30px -18px rgba(181,72,43,.45);transition:transform .15s,box-shadow .15s}
+  .nf:hover{transform:translateY(-2px);box-shadow:0 16px 34px -16px rgba(181,72,43,.5)}
+  .nf-badge{position:absolute;top:14px;right:14px;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--accent);border-radius:100px;padding:3px 9px}
+  .nf-ico{font-size:26px;margin-bottom:8px}
+  .nf-t{font-weight:800;font-size:15px;margin-bottom:4px;padding-right:48px}
+  .nf-d{font-size:13px;color:var(--muted);line-height:1.45;margin-bottom:10px}
+  .nf-go{font-size:13px;font-weight:800;color:var(--accent-dark)}
+  .field.feature{background:var(--paper);border:1.5px solid var(--accent);border-radius:18px;padding:18px}
+  .field.feature .upload{background:#fff}
+  .feat-badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--accent);border-radius:100px;padding:2px 8px;margin-right:6px;vertical-align:2px}
+  .next .newfeat{margin-top:0}
+  .next .nf{box-shadow:none}
+  .t-again{margin-top:16px}
 
   /* Premium block */
   .premium{border:1.5px solid var(--gold);border-radius:16px;padding:24px;text-align:center;background:linear-gradient(180deg,#FBF6E9,#F5ECD6)}
@@ -262,7 +277,7 @@
 
   @media print{
     body{background:#fff}
-    .hero,.quiz,.tryon,.loader,.foot,.actions,.premium .p-btn,.premium .p-note,.pricing,.topbar,.save-banner,.modal{display:none!important}
+    .hero,.quiz,.tryon,.next,.loader,.foot,.actions,.premium .p-btn,.premium .p-note,.pricing,.topbar,.save-banner,.modal{display:none!important}
     .result{display:block!important;padding:0}
     .r-card.r-summary{background:#221F1A!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
@@ -312,8 +327,11 @@
     <h1 class="serif">Өөртөө яг тохирох <em>хувцас, өнгө, үсээ</em> мэд</h1>
     <p class="lede">Хэдхэн асуултад хариулаад, биеийн онцлогт тань тохирсон хувийн стилийн зөвлөгөөг минутын дотор аваарай.</p>
     <button type="button" class="cta" id="start">Үнэгүй тестээ эхлүүлэх</button>
-    <button type="button" class="hero-alt" id="go-tryon">📸 Дэлгүүрт хувцас туршиж байна уу? Шууд шалгуулах</button>
     <div class="demo-tag">AI таны хариултад тулгуурлан зөвлөгөө гаргана</div>
+    <div class="newfeat">
+      <button type="button" class="nf" data-go="tryon"><span class="nf-badge">Шинэ</span><div class="nf-ico">📸</div><div class="nf-t">Дэлгүүрт туршиж байна уу?</div><div class="nf-d">Өмсөж буй зургаа оруулаад танд тохирох эсэх, юуг өөрчлөхийг шууд мэд.</div><span class="nf-go">Зургаа шалгуулах →</span></button>
+      <button type="button" class="nf" data-go="wardrobe"><span class="nf-badge">Шинэ</span><div class="nf-ico">🧺</div><div class="nf-t">7 хоногийн хувцасны төлөвлөгөө</div><div class="nf-d">Шүүгээнийхээ 10–20 зургийг оруулаад өдөр бүр юу өмсөхөө мэд.</div><span class="nf-go">Шүүгээгээ оруулах →</span></button>
+    </div>
     <div class="hcards">
       <div class="hcard"><div class="hc-ico">🎨</div><div class="hc-t">Өнгөний palette</div><div class="hc-d">Арьстай тохирох 6 өнгө hex кодтойгоор</div></div>
       <div class="hcard"><div class="hc-ico">👗</div><div class="hc-t">Outfit санаа</div><div class="hc-d">Нөхцөл бүрт зохих бүрэн хослол</div></div>
@@ -341,6 +359,8 @@
           <li>Өнгөний palette (6 өнгө)</li>
           <li>Үсний засалтын санал</li>
           <li>Outfit санаа (2 хослол)</li>
+          <li>Дэлгүүрт туршилт — өдөрт 3 (бүртгүүлбэл 20)</li>
+          <li>Шүүгээ + 7 хоногийн төлөвлөгөө — тайлан бүрт (бүртгүүлбэл сард 5 тайлан)</li>
           <li class="off">Selfie шинжилгээ</li>
           <li class="off">Дэлгүүрийн зөвлөмж</li>
           <li class="off">PDF тайлан</li>
@@ -354,6 +374,8 @@
         <div class="pt-sub">Бүрэн стилийн тайлан</div>
         <ul class="pt-list">
           <li>Free-ийн бүх зүйл</li>
+          <li>Дэлгүүрт туршилт — өдөрт 50</li>
+          <li>7 хоногийн төлөвлөгөө — 7 хоног бүр шинэчилнэ</li>
           <li>Selfie зургаар шинжилгээ</li>
           <li>Гоо сайханы зөвлөгөө</li>
           <li>Дэлгүүрийн зөвлөмж</li>
@@ -370,6 +392,8 @@
         <div class="pt-sub">Хувийн стилист</div>
         <ul class="pt-list">
           <li>Pro-ийн бүх зүйл</li>
+          <li>Хязгааргүй дэлгүүрт туршилт</li>
+          <li>Хязгааргүй 7 хоногийн төлөвлөгөө</li>
           <li>Хязгааргүй шинэ тайлан</li>
           <li>Улирал бүрийн шинэчлэл</li>
           <li>Стилистэд асуулт тавих</li>
@@ -420,11 +444,11 @@
       <label>Selfie зураг оруулах <span class="hint">(заавал биш — AI нүүрний хэлбэр, арьсны өнгийг өөрөө тодорхойлно)</span></label>
       <label class="upload" id="uplabel"><div class="u-ico">📷</div><div class="u-t">Зураг сонгох</div><div class="u-s">Нүүр тод харагдсан зураг · JPG/PNG</div><input type="file" id="selfie" accept="image/*"></label>
       <div class="preview" id="preview"><img id="pimg" alt=""><span class="rm" id="premove">Зураг устгах</span></div>
-      <div class="privacy-note">Таны зураг серверт <strong>хадгалагдахгүй</strong>. Зөвхөн AI шинжилгээнд нэг удаа ашиглагдаад шууд устгагдана. Дэлгэрэнгүйг <a href="/privacy.html" target="_blank">нууцлалын бодлого</a>-оос үзнэ үү.</div>
+      <div class="privacy-note"><span>Таны зураг серверт <strong>хадгалагдахгүй</strong>. Зөвхөн AI шинжилгээнд нэг удаа ашиглагдаад шууд устгагдана. Дэлгэрэнгүйг <a href="/privacy.html" target="_blank">нууцлалын бодлого</a>-оос үзнэ үү.</span></div>
     </div>
 
-    <div class="field">
-      <label>Таны хувцасны шүүгээ <span class="hint">(заавал биш — байгаа хувцаснуудынхаа 10–20 зургийг оруулбал AI хувцас бүр танд хэр тохирохыг үнэлж, 7 хоногийн хослолын төлөвлөгөө гаргана)</span></label>
+    <div class="field feature" id="wardrobe-field">
+      <label><span class="feat-badge">Шинэ</span>Таны хувцасны шүүгээ → 7 хоногийн төлөвлөгөө <span class="hint">(заавал биш — байгаа хувцаснуудынхаа 10–20 зургийг оруулбал AI хувцас бүр танд хэр тохирохыг үнэлж, 7 хоногийн хослолын төлөвлөгөө гаргана)</span></label>
       <label class="upload" id="wuplabel"><div class="u-ico">🧺</div><div class="u-t">Хувцасны зураг нэмэх</div><div class="u-s">20 хүртэл зураг · нэг эсвэл олноор сонгоно</div><input type="file" id="wardrobe" accept="image/*" multiple></label>
       <div class="wgrid" id="wgrid"></div>
       <div class="wcount" id="wcount"></div>
@@ -461,6 +485,7 @@
     <div class="r-cards" id="report"></div>
     <div class="actions">
       <button type="button" class="btn-line" id="pdf">⤓ PDF татах</button>
+      <button type="button" class="btn-line" data-go="tryon">📸 Дэлгүүрт шалгах</button>
       <button type="button" class="btn-line" id="again">↺ Дахин бөглөх</button>
     </div>
   </div>
@@ -473,13 +498,13 @@
     <p class="sub">Хувцсаа өмсөөд толины өмнө зургаа аваад оруулаарай — танд тохирч байгаа эсэхийг AI шууд хэлнэ.</p>
     <label class="upload" id="tuplabel"><div class="u-ico">📸</div><div class="u-t">Туршиж буй зургаа оруулах</div><div class="u-s">Хувцас бүтнээрээ харагдсан зураг · JPG/PNG</div><input type="file" id="tphoto" accept="image/*"></label>
     <div class="t-preview" id="tpreview"><img id="tpimg" alt=""><span class="rm" id="tremove">Зураг солих</span></div>
-    <input type="text" class="t-note" id="tnote" maxlength="200" placeholder="Заавал биш: юу туршиж байна, размер, хаана өмсөх (жишээ нь «M размер, ажилд»)">
+    <input type="text" class="t-note" id="tnote" maxlength="200" placeholder="Заавал биш: размер, хаана өмсөх (ж: M, ажилд)">
     <div class="t-profile" id="tprofile"></div>
     <button type="button" class="generate" id="tgo">Танд тохирч байна уу? Шалгах →</button>
     <div class="t-loading" id="tloading">Зургийг харж байна…</div>
     <div class="err" id="terr"></div>
     <div class="quota" id="tquota"></div>
-    <div class="privacy-note">Зураг серверт <strong>хадгалагдахгүй</strong>, шалгалтын хариу ч хадгалагдахгүй. Зөвхөн энэ удаагийн шалгалтад ашиглагдана.</div>
+    <div class="privacy-note"><span>Зураг серверт <strong>хадгалагдахгүй</strong>, шалгалтын хариу ч хадгалагдахгүй. Зөвхөн энэ удаагийн шалгалтад ашиглагдана.</span></div>
     <div class="t-result" id="tresult"></div>
   </div>
 </section>
@@ -793,7 +818,22 @@
   ['height','weight'].forEach(k=>$(k).addEventListener('change',renderTryonProfile));
   renderTryonProfile();
 
-  $('go-tryon').addEventListener('click',()=>$('tryon').scrollIntoView({behavior:'smooth'}));
+  // «Шинэ» картууд, тайлангийн дараах алхам — data-go="tryon" | "wardrobe" | "week"
+  function goTo(where){
+    if(where==='wardrobe'){
+      // Өмнөх хариулт санах ойд хэвээр — тест рүү буцаад шүүгээний хэсэгт очно
+      $('result').style.display='none';
+      $('quiz').style.display='block';
+      $('wardrobe-field').scrollIntoView({behavior:'smooth',block:'center'});
+    }else if(where==='week'){
+      $('wardrobe-card').scrollIntoView({behavior:'smooth'});
+    }else{
+      $('tryon').scrollIntoView({behavior:'smooth'});
+    }
+  }
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('[data-go]'); if(b) goTo(b.dataset.go);
+  });
   $('tphoto').addEventListener('change',async e=>{
     const f=e.target.files[0]; e.target.value=''; if(!f) return;
     try{ tPhoto=await resizeImage(f); }catch(ex){ console.error(ex); return; }
@@ -831,7 +871,9 @@
       (t.huvtsas?'<div class="t-item">'+esc(t.huvtsas)+'</div>':'')+
       ((t.yagaad||[]).length?'<div class="r-sub" style="margin-top:16px">Яагаад</div>'+liList(t.yagaad):'')+
       ((t.oorchlolt||[]).length?'<div class="r-sub">'+(v==='tohirno'?'Бүр гоё болгох':'Ингэвэл илүү')+'</div>'+liList(t.oorchlolt):'')+
-      (t.razmer?'<p class="size-note">📏 '+esc(t.razmer)+'</p>':'');
+      (t.razmer?'<p class="size-note">📏 '+esc(t.razmer)+'</p>':'')+
+      '<button type="button" class="btn-line t-again" id="t-again">📸 Өөр хувцас шалгах</button>';
+    $('t-again').addEventListener('click',()=>{ $('tremove').click(); $('tphoto').click(); });
     $('tresult').style.display='block';
     $('tresult').scrollIntoView({behavior:'smooth',block:'nearest'});
   }
@@ -903,6 +945,18 @@
     return w ? w.dataUrl : '';
   }
 
+  // Тайлангийн дараах алхам: шүүгээгүй бол оруулахыг, байвал төлөвлөгөөг үзэхийг санал болгоно
+  function nextCard(hasWeek){
+    const ward=hasWeek
+      ? '<button type="button" class="nf" data-go="week"><div class="nf-ico">🗓️</div><div class="nf-t">Таны 7 хоногийн төлөвлөгөө бэлэн</div><div class="nf-d">Хувцас бүрийн үнэлгээ, өдөр бүрийн хослол яг доор байна.</div><span class="nf-go">Үзэх ↓</span></button>'
+      : '<button type="button" class="nf" data-go="wardrobe"><div class="nf-ico">🧺</div><div class="nf-t">Шүүгээгээ нэмээд 7 хоногийн төлөвлөгөө ав</div><div class="nf-d">Хариултууд тань хадгалагдсан — зөвхөн хувцасныхаа 10–20 зургийг нэмнэ.</div><span class="nf-go">Шүүгээгээ оруулах →</span></button>';
+    return '<div class="r-card next">'+
+      '<div class="r-card-head"><span class="rh-ico">👉</span>Дараагийн алхам</div>'+
+      '<div class="newfeat">'+ward+
+        '<button type="button" class="nf" data-go="tryon"><div class="nf-ico">📸</div><div class="nf-t">Дэлгүүрт туршиж үзэх</div><div class="nf-d">Энэ тайлангийн мэдээллээр өмссөн хувцас тань тохирох эсэхийг шалгана.</div><span class="nf-go">Зургаа шалгуулах →</span></button>'+
+      '</div></div>';
+  }
+
   function render(r,opts){
     saveBanner(opts||{});
     const cdetails=(r.ongo||[]).filter(c=>c.yagaad||c.ilerhiilel||c.setgegdel).map(c=>
@@ -959,7 +1013,7 @@
     const woutfits=(r.wardrobe_outfit||[]).map(o=>
       '<div class="ocard"><div class="wo-imgs">'+wImgs(o.indexuud)+'</div><div class="o-h">'+esc(o.nohtsol)+'</div><p>'+esc(o.tailbar)+'</p></div>').join('');
     const wardrobeCard=witems ?
-      '<div class="r-card">'+
+      '<div class="r-card" id="wardrobe-card">'+
         '<div class="r-card-head"><span class="rh-ico">🧺</span>Таны шүүгээ</div>'+
         '<div class="r-sub">'+(rated?'Хувцас бүр танд хэр тохирох вэ':'Танилцуулсан хувцаснууд')+'</div>'+
         witems+
@@ -976,6 +1030,9 @@
         '<div class="tovch-text">'+esc(r.tovch)+'</div>'+
         todayHtml+
       '</div>'+
+
+      nextCard(!!week)+
+      wardrobeCard+
 
       // Card 2 — Хувцасны стиль
       '<div class="r-card">'+
@@ -1002,8 +1059,6 @@
         '<div class="r-card-head"><span class="rh-ico">✨</span>Outfit санаа</div>'+
         outfits+
       '</div>'+
-
-      wardrobeCard+
 
       // Card 5 — Гутал & Аксессуар
       '<div class="r-card">'+
