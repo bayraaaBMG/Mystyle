@@ -49,6 +49,19 @@
   .admins{margin-top:6px;font-size:12px;color:var(--muted)}
   .admins span{display:inline-flex;align-items:center;gap:4px;margin-right:10px}
   .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  .lvl{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.08em;border-radius:100px;padding:1px 7px}
+  .lvl.OWNER{background:var(--ink);color:var(--paper)}
+  .lvl.MANAGER{background:rgba(110,101,87,.15);color:var(--ink)}
+  .mstore{border-top:1px solid var(--line);padding-top:16px;margin-top:16px}
+  .mstore:first-of-type{border-top:none;padding-top:0;margin-top:0}
+  .mstore h3{font-size:15px;display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .team{margin-top:14px}
+  .team h4{font-size:12px;color:var(--muted);letter-spacing:.04em;margin-bottom:6px}
+  .trow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;flex-wrap:wrap}
+  .trow .em{flex:1;min-width:160px;overflow-wrap:anywhere}
+  .trow select{padding:3px 8px;font-size:12px}
+  .tadd{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .tadd input{flex:1;min-width:180px}
   a{color:var(--accent-dark)}
   .hidden{display:none}
   button{white-space:nowrap}
@@ -89,7 +102,7 @@
 
   <div class="card hidden" id="denied">
     <h2>Эрх хүрэхгүй байна</h2>
-    <p class="hint">Энэ хуудсыг зөвхөн SUPER_ADMIN болон дэлгүүрийн админ үзнэ. <a href="#" id="logout1">Өөр бүртгэлээр нэвтрэх</a></p>
+    <p class="hint">Энэ хуудсыг зөвхөн SUPER_ADMIN болон дэлгүүрийн OWNER/MANAGER үзнэ. <a href="#" id="logout1">Өөр бүртгэлээр нэвтрэх</a></p>
   </div>
 
   <div id="app" class="hidden">
@@ -100,17 +113,12 @@
       <div class="events" id="events"></div>
     </div>
 
-    <!-- STORE_ADMIN: өөрийн дэлгүүр -->
+    <!-- Дэлгүүрийн админ (OWNER / MANAGER): өөрийн дэлгүүрүүд -->
     <div class="card hidden" id="my-store">
-      <h2>Миний дэлгүүр</h2>
-      <p class="hint" style="margin:0 0 12px">Хэрэглэгчдэд өгөх холбоос: <a id="my-link" target="_blank"></a></p>
-      <form class="form" id="my-form">
-        <label>Нэр<input id="my-name" maxlength="80" required></label>
-        <label>Брэнд өнгө<input id="my-accent" type="color"></label>
-        <button type="submit">Хадгалах</button>
-      </form>
-      <div class="msg" id="my-msg"></div>
-      <p class="hint">Та зөвхөн дэлгүүрийнхээ нийлбэр статистикийг харна. Хэрэглэгчийн хувийн тайлан, мэдээлэл харагдахгүй.</p>
+      <h2 id="my-title">Миний дэлгүүр</h2>
+      <div id="my-stores"></div>
+      <p class="hint">Та зөвхөн дэлгүүрийнхээ нийлбэр статистикийг харна. Хэрэглэгчийн хувийн тайлан, мэдээлэл харагдахгүй.
+        <b>OWNER</b> — багаа (админуудаа) удирдана, <b>MANAGER</b> — статистик харж, нэр/өнгө засна.</p>
     </div>
 
     <!-- SUPER_ADMIN: дэлгүүрүүд -->
@@ -129,7 +137,7 @@
         <button type="submit">Нэмэх</button>
       </form>
       <div class="msg" id="ns-msg"></div>
-      <p class="hint">Дэлгүүрийн админ нэмэхийн тулд тухайн хүн эхлээд апп дээр бүртгүүлсэн байх ёстой.</p>
+      <p class="hint">Дэлгүүрийн админ нэмэхийн тулд тухайн хүн эхлээд апп дээр бүртгүүлсэн байх ёстой. Дэлгүүр бүрд эхлээд OWNER нэмбэл тэр өөрөө багаа удирдана. Сүүлийн OWNER-ийг хасах боломжгүй.</p>
     </div>
   </div>
 </div>
@@ -140,7 +148,8 @@
   const show=(id,on)=>$(id).classList.toggle('hidden',!on);
   const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt=n=>Number(n||0).toLocaleString('en-US');
-  let me=null, stores=[];
+  let me=null, stores=[], myStores=[];
+  const LEVEL_OPTS=l=>['MANAGER','OWNER'].map(v=>'<option value="'+v+'"'+(v===l?' selected':'')+'>'+v+'</option>').join('');
 
   async function api(path,opts){
     const res=await fetch(path,Object.assign({headers:{"Content-Type":"application/json"}},opts||{}));
@@ -156,10 +165,11 @@
       const d=await api('/api/admin/me');
       me=d.user;
       $('who').textContent=me.email;
-      $('role').textContent=me.role; show('role',true);
+      $('role').textContent=me.role==='SUPER_ADMIN'?'SUPER_ADMIN':'ДЭЛГҮҮРИЙН АДМИН'; show('role',true);
       show('app',true);
+      show('stores-card',false); show('my-store',false); show('stat-scope',false);
       if(me.role==='SUPER_ADMIN'){ show('stores-card',true); show('stat-scope',true); await loadStores(); }
-      else { show('my-store',true); fillMyStore(d.store); }
+      else { myStores=d.stores||[]; show('my-store',true); fillScopeMine(); await renderMyStores(); }
       await loadStats();
     }catch(e){
       if(e.status===401) show('login-card',true);
@@ -192,16 +202,78 @@
   }
   $('stat-scope').addEventListener('change',loadStats);
 
-  function fillMyStore(st){
-    if(!st){ $('my-form').innerHTML='<p class="hint">Танд дэлгүүр оноогоогүй байна.</p>'; return; }
-    $('my-name').value=st.name; $('my-accent').value=st.accent||'#B5482B';
-    const url=location.origin+'/s/'+st.slug; $('my-link').href=url; $('my-link').textContent=url;
-    $('my-form').onsubmit=async e=>{
-      e.preventDefault();
-      try{ await api('/api/admin/stores/'+st.id,{method:'PATCH',body:JSON.stringify({name:$('my-name').value,accent:$('my-accent').value})}); msg('my-msg','Хадгаллаа',true); }
-      catch(ex){ msg('my-msg',ex.message); }
-    };
+  // Олон дэлгүүртэй админд статистикийн хүрээ сонгох
+  function fillScopeMine(){
+    if(myStores.length<2) return;
+    $('stat-scope').innerHTML='<option value="">Миний бүх дэлгүүр (нийлбэр)</option>'+myStores.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>').join('');
+    show('stat-scope',true);
   }
+
+  async function renderMyStores(){
+    $('my-title').textContent=myStores.length>1?'Миний дэлгүүрүүд ('+myStores.length+')':'Миний дэлгүүр';
+    const teams=await Promise.all(myStores.map(s=>s.level==='OWNER'
+      ? api('/api/admin/stores/'+s.id+'/admins').then(d=>d.admins).catch(()=>[]) : Promise.resolve(null)));
+    $('my-stores').innerHTML=myStores.map((s,i)=>{
+      const url=location.origin+'/s/'+s.slug;
+      const team=teams[i];
+      return '<div class="mstore" data-id="'+esc(s.id)+'">'+
+        '<h3>'+esc(s.name)+' <span class="lvl '+esc(s.level)+'">'+esc(s.level)+'</span>'+(s.active?'':' <span class="pill off">Зогссон</span>')+'</h3>'+
+        '<p class="hint" style="margin:0 0 10px">Хэрэглэгчдэд өгөх холбоос: <a href="'+esc(url)+'" target="_blank">'+esc(url)+'</a></p>'+
+        '<form class="form st-form">'+
+          '<label>Нэр<input class="st-name" maxlength="80" required value="'+esc(s.name)+'"></label>'+
+          '<label>Брэнд өнгө<input class="st-accent" type="color" value="'+esc(s.accent||'#B5482B')+'"></label>'+
+          '<button type="submit">Хадгалах</button>'+
+        '</form><div class="msg st-msg"></div>'+
+        (team?'<div class="team"><h4>БАГ</h4>'+teamRows(team,me.id)+
+          '<div class="tadd"><input class="t-email" type="email" placeholder="Бүртгэлтэй хүний и-мэйл"><select class="t-level">'+LEVEL_OPTS('MANAGER')+'</select><button type="button" class="line" data-tadd>+ Нэмэх</button></div>'+
+          '<div class="msg t-msg"></div></div>':'')+
+      '</div>';
+    }).join('');
+  }
+  function teamRows(team,selfId){
+    return team.map(a=>'<div class="trow" data-uid="'+esc(a.id)+'"><span class="em">'+esc(a.email)+(a.id===selfId?' (та)':'')+'</span>'+
+      '<select class="t-change">'+LEVEL_OPTS(a.level)+'</select>'+
+      '<button type="button" class="sm line" data-trm>Хасах</button></div>').join('');
+  }
+
+  $('my-stores').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const box=e.target.closest('.mstore'), id=box.dataset.id;
+    try{
+      await api('/api/admin/stores/'+id,{method:'PATCH',body:JSON.stringify({name:box.querySelector('.st-name').value,accent:box.querySelector('.st-accent').value})});
+      const st=myStores.find(s=>s.id===id); st.name=box.querySelector('.st-name').value; st.accent=box.querySelector('.st-accent').value;
+      msg2(box,'.st-msg','Хадгаллаа',true);
+    }catch(ex){ msg2(box,'.st-msg',ex.message); }
+  });
+  // Багийн өөрчлөлт: нэмэх, түвшин солих, хасах (OWNER)
+  async function teamAction(box,fn,okText){
+    try{ await fn(); await refreshMe(); msg2(document.querySelector('.mstore[data-id="'+box.dataset.id+'"]'),'.t-msg',okText,true); }
+    catch(ex){ msg2(box,'.t-msg',ex.message); }
+  }
+  // Өөрийгөө MANAGER болгосон / хассан бол эрх өөрчлөгдөнө — дахин ачаална
+  async function refreshMe(){
+    const d=await api('/api/admin/me').catch(()=>null);
+    if(!d){ boot(); return; }
+    myStores=d.stores||[]; await renderMyStores();
+  }
+  $('my-stores').addEventListener('click',e=>{
+    const box=e.target.closest('.mstore'); if(!box) return; const id=box.dataset.id;
+    if(e.target.hasAttribute('data-tadd')){
+      const email=box.querySelector('.t-email').value, level=box.querySelector('.t-level').value;
+      teamAction(box,()=>api('/api/admin/stores/'+id+'/admins',{method:'POST',body:JSON.stringify({email,level})}),'Нэмэгдлээ');
+    }else if(e.target.hasAttribute('data-trm')){
+      const row=e.target.closest('.trow');
+      if(!confirm('Энэ хүний админ эрхийг хасах уу?')) return;
+      teamAction(box,()=>api('/api/admin/stores/'+id+'/admins/'+row.dataset.uid,{method:'DELETE'}),'Хасагдлаа');
+    }
+  });
+  $('my-stores').addEventListener('change',e=>{
+    if(!e.target.classList.contains('t-change')) return;
+    const box=e.target.closest('.mstore'), row=e.target.closest('.trow');
+    const email=row.querySelector('.em').textContent.replace(' (та)','');
+    teamAction(box,()=>api('/api/admin/stores/'+box.dataset.id+'/admins',{method:'POST',body:JSON.stringify({email,level:e.target.value})}),'Түвшин солигдлоо');
+  });
+  function msg2(box,sel,text,ok){ if(!box) return; const el=box.querySelector(sel); if(!el) return; el.textContent=text||''; el.className=el.className.replace(/ ?(ok|err)\b/g,'')+' '+(ok?'ok':'err'); }
 
   async function loadStores(){
     stores=(await api('/api/admin/stores')).stores;
@@ -212,8 +284,9 @@
     $('stores').innerHTML=stores.length?stores.map((s,i)=>
       '<tr data-id="'+esc(s.id)+'">'+
         '<td><span class="swatch" style="background:'+(/^#[0-9a-fA-F]{6}$/.test(s.accent||'')?s.accent:'transparent')+'"></span> <b>'+esc(s.name)+'</b>'+
-          '<div class="admins">'+admins[i].map(a=>'<span>'+esc(a.email)+' <button class="sm line" data-rm="'+esc(a.id)+'">✕</button></span>').join('')+
-          '<span><input class="add-email" type="email" placeholder="админ и-мэйл" style="width:150px;padding:3px 8px;font-size:12px"> <button class="sm line" data-add>+ Админ</button></span></div></td>'+
+          '<div class="admins">'+admins[i].map(a=>'<span>'+esc(a.email)+' <span class="lvl '+esc(a.level)+'">'+esc(a.level)+'</span> <button class="sm line" data-rm="'+esc(a.id)+'">✕</button></span>').join('')+
+          (admins[i].some(a=>a.level==='OWNER')?'':'<span style="color:var(--accent-dark)">OWNER алга</span>')+
+          '<span><input class="add-email" type="email" placeholder="админ и-мэйл" style="width:150px;padding:3px 8px;font-size:12px"> <select class="add-level" style="padding:3px 6px;font-size:12px">'+LEVEL_OPTS(admins[i].some(a=>a.level==='OWNER')?'MANAGER':'OWNER')+'</select> <button class="sm line" data-add>+ Админ</button></span></div></td>'+
         '<td data-l="Холбоос"><a href="/s/'+esc(s.slug)+'" target="_blank">/s/'+esc(s.slug)+'</a></td>'+
         '<td class="num" data-l="Тайлан">'+fmt(s.reports)+'</td>'+
         '<td data-l="Өдрийн хязгаар"><input class="cap" type="number" min="0" value="'+(s.daily_cap==null?'':esc(s.daily_cap))+'" placeholder="∞" style="width:80px"></td>'+
@@ -232,7 +305,7 @@
       }else if(e.target.hasAttribute('data-toggle')){
         await api('/api/admin/stores/'+id,{method:'PATCH',body:JSON.stringify({active:!st.active})});
       }else if(e.target.hasAttribute('data-add')){
-        await api('/api/admin/stores/'+id+'/admins',{method:'POST',body:JSON.stringify({email:tr.querySelector('.add-email').value})});
+        await api('/api/admin/stores/'+id+'/admins',{method:'POST',body:JSON.stringify({email:tr.querySelector('.add-email').value,level:tr.querySelector('.add-level').value})});
       }else if(e.target.dataset.rm){
         if(!confirm('Энэ хүний админ эрхийг хасах уу?')) return;
         await api('/api/admin/stores/'+id+'/admins/'+e.target.dataset.rm,{method:'DELETE'});

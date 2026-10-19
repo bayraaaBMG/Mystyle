@@ -35,8 +35,11 @@ const PRICES = {
   "claude-haiku-4-5-20251001": [1, 5],
 };
 
-// Роль: SUPER_ADMIN — бүх дэлгүүр; STORE_ADMIN — зөвхөн өөрийн дэлгүүр (нийлбэр статистик); USER — энгийн хэрэглэгч
+// users.role: SUPER_ADMIN — бүх систем; USER — бусад. Дэлгүүрийн админ эсэхийг store_admins-аас тодорхойлно:
+// OWNER — багаа (админуудаа) удирдана + MANAGER-ийн бүх эрх; MANAGER — нийлбэр статистик, нэр/өнгө засна.
+// STORE_ADMIN нь API-д буцаах "дор хаяж нэг дэлгүүрийн админ" гэсэн тооцоолсон роль.
 const ROLES = { SUPER_ADMIN: "SUPER_ADMIN", STORE_ADMIN: "STORE_ADMIN", USER: "USER" };
+const LEVELS = { OWNER: "OWNER", MANAGER: "MANAGER" };
 // Эдгээр и-мэйлээр нэвтэрсэн хүн автоматаар SUPER_ADMIN болно (анхны админ үүсгэх арга)
 const SUPER_ADMIN_EMAILS = new Set(
   String(process.env.SUPER_ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
@@ -79,15 +82,44 @@ function createApp(store = createStore()) {
   // SUPER_ADMIN_EMAILS-д байгаа хэрэглэгчийг SUPER_ADMIN болгоно
   async function promoteIfSuper(user) {
     if (SUPER_ADMIN_EMAILS.has(user.email) && user.role !== ROLES.SUPER_ADMIN) {
-      await store.setUserRole(user.id, ROLES.SUPER_ADMIN, null);
+      await store.setUserRole(user.id, ROLES.SUPER_ADMIN);
     }
   }
 
-  async function requireRole(req, res, roles) {
+  const isSuper = (user) => !!user && user.role === ROLES.SUPER_ADMIN;
+
+  // Хэрэглэгч энэ дэлгүүрт need (MANAGER эсвэл OWNER) түвшний эрхтэй юу. OWNER нь MANAGER-ийн эрхийг багтаана.
+  async function canManage(user, storeId, need = LEVELS.MANAGER) {
+    if (!user || !storeId) return false;
+    if (isSuper(user)) return true;
+    const level = await store.getStoreLevel(storeId, user.id);
+    return level === LEVELS.OWNER || (level === LEVELS.MANAGER && need === LEVELS.MANAGER);
+  }
+
+  // Админ хуудсанд нэвтрэх: SUPER_ADMIN эсвэл дор хаяж нэг дэлгүүрийн OWNER/MANAGER.
+  // Буцаах: { user, role, stores } — stores нь дэлгүүрийн админы удирддаг дэлгүүрүүд (level-тэй).
+  async function requireAdmin(req, res) {
     const user = await currentUser(req);
     if (!user) { res.status(401).json({ error: "Нэвтрээгүй байна." }); return null; }
-    if (!roles.includes(user.role)) { res.status(403).json({ error: "Эрх хүрэхгүй байна." }); return null; }
+    if (isSuper(user)) return { user, role: ROLES.SUPER_ADMIN, stores: [] };
+    const stores = await store.listUserStores(user.id);
+    if (!stores.length) { res.status(403).json({ error: "Эрх хүрэхгүй байна." }); return null; }
+    return { user, role: ROLES.STORE_ADMIN, stores };
+  }
+  async function requireSuper(req, res) {
+    const user = await currentUser(req);
+    if (!user) { res.status(401).json({ error: "Нэвтрээгүй байна." }); return null; }
+    if (!isSuper(user)) { res.status(403).json({ error: "Эрх хүрэхгүй байна." }); return null; }
     return user;
+  }
+  // req.params.id дэлгүүрт need түвшний эрх шаардана. Эрхгүй бол 403 (дэлгүүр байгаа эсэхийг задруулахгүй), байхгүй бол 404.
+  async function requireStore(req, res, need) {
+    const user = await currentUser(req);
+    if (!user) { res.status(401).json({ error: "Нэвтрээгүй байна." }); return null; }
+    if (!(await canManage(user, req.params.id, need))) { res.status(403).json({ error: "Эрх хүрэхгүй байна." }); return null; }
+    const st = await store.getStoreById(req.params.id);
+    if (!st) { res.status(404).json({ error: "Дэлгүүр олдсонгүй." }); return null; }
+    return { user, st };
   }
 
   async function authThrottle(req, res) {
@@ -153,7 +185,9 @@ function createApp(store = createStore()) {
     // Өмнөх тестийн хариулт — дахин бөглөхөд урьдчилан бөглөнө
     const lastInput = user ? await store.getLastInput(user.id) : null;
     const tryonQuota = await limits.tryonRemaining(store, { userId: user && user.id, ipHash: ipHash(req) });
-    res.json({ user: user ? { id: user.id, email: user.email, role: user.role, storeId: user.store_id } : null, quota, tryonQuota, lastInput });
+    let role = null;
+    if (user) role = isSuper(user) ? ROLES.SUPER_ADMIN : (await store.listUserStores(user.id)).length ? ROLES.STORE_ADMIN : ROLES.USER;
+    res.json({ user: user ? { id: user.id, email: user.email, role } : null, quota, tryonQuota, lastInput });
   }));
 
   // Бүртгэл болон бүх тайланг бүрмөсөн устгах (privacy)
@@ -195,8 +229,9 @@ function createApp(store = createStore()) {
 
   // ---------- Админ ----------
 
-  async function statsFor(storeId) {
-    const s = await store.stats(limits.ubDayStartIso(), storeId);
+  // storeIds: null — бүх систем; массив — зөвхөн тэдгээр дэлгүүрийн нийлбэр
+  async function statsFor(storeIds) {
+    const s = await store.stats(limits.ubDayStartIso(), storeIds);
     const costUsd = s.byModel.reduce((sum, m) => {
       const [pi, po] = PRICES[m.model] || [0, 0];
       return sum + (Number(m.input_tokens) * pi + Number(m.output_tokens) * po) / 1e6;
@@ -204,26 +239,28 @@ function createApp(store = createStore()) {
     return { ...s, estimatedCostUsd: Math.round(costUsd * 100) / 100, limits: limits.LIMITS, model: MODEL };
   }
 
-  // ADMIN_TOKEN (скрипт, curl) → бүх систем. SUPER_ADMIN → бүх систем эсвэл ?store=<id>. STORE_ADMIN → зөвхөн өөрийн дэлгүүр.
+  // ADMIN_TOKEN (скрипт, curl) → бүх систем. SUPER_ADMIN → бүх систем эсвэл ?store=<id>.
+  // Дэлгүүрийн админ → ?store=<id> (өөрийн дэлгүүр) эсвэл өгөхгүй бол өөрийн бүх дэлгүүрийн нийлбэр.
   app.get("/api/admin/stats", wrap(async (req, res) => {
     const given = String(req.headers.authorization || "").replace(/^Bearer /, "");
     const tokenOk = ADMIN_TOKEN && given.length === ADMIN_TOKEN.length &&
       crypto.timingSafeEqual(Buffer.from(given), Buffer.from(ADMIN_TOKEN));
     if (tokenOk) return res.json(await statsFor(null));
-    const user = await requireRole(req, res, [ROLES.SUPER_ADMIN, ROLES.STORE_ADMIN]);
-    if (!user) return;
-    if (user.role === ROLES.STORE_ADMIN) {
-      if (!user.store_id) return res.status(403).json({ error: "Танд дэлгүүр оноогоогүй байна." });
-      return res.json(await statsFor(user.store_id));
+    const ctx = await requireAdmin(req, res);
+    if (!ctx) return;
+    const want = typeof req.query.store === "string" && req.query.store ? req.query.store : null;
+    if (ctx.role === ROLES.SUPER_ADMIN) return res.json(await statsFor(want ? [want] : null));
+    if (want) {
+      if (!ctx.stores.some((s) => s.id === want)) return res.status(403).json({ error: "Эрх хүрэхгүй байна." });
+      return res.json(await statsFor([want]));
     }
-    res.json(await statsFor(typeof req.query.store === "string" && req.query.store ? req.query.store : null));
+    res.json(await statsFor(ctx.stores.map((s) => s.id)));
   }));
 
   app.get("/api/admin/me", wrap(async (req, res) => {
-    const user = await requireRole(req, res, [ROLES.SUPER_ADMIN, ROLES.STORE_ADMIN]);
-    if (!user) return;
-    const st = user.store_id ? await store.getStoreById(user.store_id) : null;
-    res.json({ user: { id: user.id, email: user.email, role: user.role }, store: st });
+    const ctx = await requireAdmin(req, res);
+    if (!ctx) return;
+    res.json({ user: { id: ctx.user.id, email: ctx.user.email, role: ctx.role }, stores: ctx.stores });
   }));
 
   function readStoreFields(body, { partial }) {
@@ -253,12 +290,12 @@ function createApp(store = createStore()) {
   }
 
   app.get("/api/admin/stores", wrap(async (req, res) => {
-    if (!(await requireRole(req, res, [ROLES.SUPER_ADMIN]))) return;
+    if (!(await requireSuper(req, res))) return;
     res.json({ stores: await store.listStores() });
   }));
 
   app.post("/api/admin/stores", wrap(async (req, res) => {
-    if (!(await requireRole(req, res, [ROLES.SUPER_ADMIN]))) return;
+    if (!(await requireSuper(req, res))) return;
     const { f, error } = readStoreFields(req.body, { partial: false });
     if (error) return res.status(400).json({ error });
     const row = await store.createStoreRow({ id: crypto.randomUUID(), ...f });
@@ -266,48 +303,50 @@ function createApp(store = createStore()) {
     res.json({ store: row });
   }));
 
-  // SUPER_ADMIN бүгдийг; STORE_ADMIN зөвхөн өөрийн дэлгүүрийн нэр, өнгийг засна
+  // SUPER_ADMIN бүгдийг; OWNER/MANAGER зөвхөн нэр, өнгийг засна
   app.patch("/api/admin/stores/:id", wrap(async (req, res) => {
-    const user = await requireRole(req, res, [ROLES.SUPER_ADMIN, ROLES.STORE_ADMIN]);
-    if (!user) return;
-    const isSuper = user.role === ROLES.SUPER_ADMIN;
-    if (!isSuper && user.store_id !== req.params.id) return res.status(403).json({ error: "Эрх хүрэхгүй байна." });
+    const ok = await requireStore(req, res, LEVELS.MANAGER);
+    if (!ok) return;
     const body = { ...(req.body || {}) };
     delete body.slug; // slug-ийг өөрчлөхгүй — холбоосууд эвдэрнэ
-    if (!isSuper) { delete body.active; delete body.dailyCap; }
+    if (!isSuper(ok.user)) { delete body.active; delete body.dailyCap; }
     const { f, error } = readStoreFields(body, { partial: true });
     if (error) return res.status(400).json({ error });
-    const row = await store.updateStore(req.params.id, f);
-    if (!row) return res.status(404).json({ error: "Дэлгүүр олдсонгүй." });
-    res.json({ store: row });
+    res.json({ store: await store.updateStore(req.params.id, f) });
   }));
 
+  // ---------- Дэлгүүрийн баг: SUPER_ADMIN эсвэл тухайн дэлгүүрийн OWNER ----------
+
   app.get("/api/admin/stores/:id/admins", wrap(async (req, res) => {
-    const user = await requireRole(req, res, [ROLES.SUPER_ADMIN, ROLES.STORE_ADMIN]);
-    if (!user) return;
-    if (user.role !== ROLES.SUPER_ADMIN && user.store_id !== req.params.id) return res.status(403).json({ error: "Эрх хүрэхгүй байна." });
+    if (!(await requireStore(req, res, LEVELS.OWNER))) return;
     res.json({ admins: await store.listStoreAdmins(req.params.id) });
   }));
 
-  // Бүртгэлтэй хэрэглэгчийг дэлгүүрийн админ болгох (SUPER_ADMIN)
+  // Бүртгэлтэй хэрэглэгчийг админ болгох эсвэл түвшинг нь солих: { email, level: OWNER | MANAGER }
   app.post("/api/admin/stores/:id/admins", wrap(async (req, res) => {
-    if (!(await requireRole(req, res, [ROLES.SUPER_ADMIN]))) return;
-    const st = await store.getStoreById(req.params.id);
-    if (!st) return res.status(404).json({ error: "Дэлгүүр олдсонгүй." });
+    if (!(await requireStore(req, res, LEVELS.OWNER))) return;
+    const level = String((req.body && req.body.level) || LEVELS.MANAGER).toUpperCase();
+    if (!LEVELS[level]) return res.status(400).json({ error: "Түвшин OWNER эсвэл MANAGER байна." });
     const email = String((req.body && req.body.email) || "").trim().toLowerCase();
     const target = email && (await store.getUserByEmail(email));
     if (!target) return res.status(404).json({ error: "Энэ и-мэйлтэй хэрэглэгч олдсонгүй. Эхлээд апп дээр бүртгүүлэх хэрэгтэй." });
-    if (target.role === ROLES.SUPER_ADMIN) return res.status(400).json({ error: "SUPER_ADMIN-ийг дэлгүүрийн админ болгохгүй." });
-    res.json({ admin: await store.setUserRole(target.id, ROLES.STORE_ADMIN, st.id) });
+    if (target.role === ROLES.SUPER_ADMIN) return res.status(400).json({ error: "SUPER_ADMIN бүх дэлгүүрт эрхтэй тул нэмэх шаардлагагүй." });
+    const current = await store.getStoreLevel(req.params.id, target.id);
+    if (current === LEVELS.OWNER && level !== LEVELS.OWNER && (await store.countStoreOwners(req.params.id)) <= 1) {
+      return res.status(400).json({ error: "Дэлгүүрт дор хаяж нэг OWNER байх ёстой. Эхлээд өөр OWNER нэмнэ үү." });
+    }
+    const row = await store.setStoreAdmin(req.params.id, target.id, level);
+    res.json({ admin: { id: target.id, email: target.email, level: row.level } });
   }));
 
   app.delete("/api/admin/stores/:id/admins/:userId", wrap(async (req, res) => {
-    if (!(await requireRole(req, res, [ROLES.SUPER_ADMIN]))) return;
-    const target = await store.getUserById(req.params.userId);
-    if (!target || target.role !== ROLES.STORE_ADMIN || target.store_id !== req.params.id) {
-      return res.status(404).json({ error: "Энэ дэлгүүрийн админ олдсонгүй." });
+    if (!(await requireStore(req, res, LEVELS.OWNER))) return;
+    const level = await store.getStoreLevel(req.params.id, req.params.userId);
+    if (!level) return res.status(404).json({ error: "Энэ дэлгүүрийн админ олдсонгүй." });
+    if (level === LEVELS.OWNER && (await store.countStoreOwners(req.params.id)) <= 1) {
+      return res.status(400).json({ error: "Сүүлийн OWNER-ийг хасах боломжгүй. Эхлээд өөр OWNER нэмнэ үү." });
     }
-    await store.setUserRole(target.id, ROLES.USER, null);
+    await store.removeStoreAdmin(req.params.id, req.params.userId);
     res.json({ ok: true });
   }));
 

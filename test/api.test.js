@@ -34,7 +34,7 @@ async function freshStore() {
   if (!PG_URL) return createFileStore(null);
   const { Pool } = require("pg");
   const pool = new Pool({ connectionString: PG_URL });
-  await pool.query("drop table if exists reports, users, quota_usage, report_cache, events, stores cascade");
+  await pool.query("drop table if exists store_admins, reports, users, quota_usage, report_cache, events, stores cascade");
   await pool.end();
   return createPgStore(PG_URL);
 }
@@ -253,14 +253,15 @@ test("multi-tenant: дэлгүүр, роль, store_id, дэлгүүрийн х�
   // Дэлгүүрийн админ оноох
   assert.strictEqual((await call(`/api/admin/stores/${nomin.id}/admins`, { method: "POST", cookie: boss, body: { email: "nobody@my.mn" } })).status, 404);
   assert.strictEqual((await call(`/api/admin/stores/${nomin.id}/admins`, { method: "POST", cookie: boss, body: { email: "boss@my.mn" } })).status, 400);
-  r = await call(`/api/admin/stores/${nomin.id}/admins`, { method: "POST", cookie: boss, body: { email: "shop@my.mn" } });
-  assert.strictEqual(r.data.admin.role, "STORE_ADMIN");
+  r = await call(`/api/admin/stores/${nomin.id}/admins`, { method: "POST", cookie: boss, body: { email: "shop@my.mn", level: "OWNER" } });
+  assert.strictEqual(r.data.admin.level, "OWNER");
+  assert.strictEqual((await call("/api/me", { cookie: shopAdmin })).data.user.role, "STORE_ADMIN");
 
   // STORE_ADMIN зөвхөн өөрийн дэлгүүрийн нийлбэрийг харна
   r = await call("/api/admin/stats", { cookie: shopAdmin });
   assert.strictEqual(r.data.reports.total, 1);
   assert.strictEqual(r.data.users, 1);
-  assert.strictEqual((await call("/api/admin/stats?store=" + other.id, { cookie: shopAdmin })).data.reports.total, 1); // ?store үл тоогдоно
+  assert.strictEqual((await call("/api/admin/stats?store=" + other.id, { cookie: shopAdmin })).status, 403); // өөр дэлгүүр
   assert.strictEqual((await call("/api/admin/stores", { cookie: shopAdmin })).status, 403);
   assert.strictEqual((await call(`/api/admin/stores/${other.id}`, { method: "PATCH", cookie: shopAdmin, body: { name: "Hack" } })).status, 403);
   r = await call(`/api/admin/stores/${nomin.id}`, { method: "PATCH", cookie: shopAdmin, body: { name: "Nomin 2", dailyCap: 9999, active: false } });
@@ -279,8 +280,11 @@ test("multi-tenant: дэлгүүр, роль, store_id, дэлгүүрийн х�
   assert.strictEqual((await call("/api/store/nomin")).status, 404);
   assert.strictEqual((await call("/s/nomin")).status, 302);
 
-  // Админ эрх хасах
+  // Сүүлийн OWNER-ийг SUPER_ADMIN ч хасахгүй; өөр OWNER нэмсний дараа хасна
   const shopUser = (await call("/api/me", { cookie: shopAdmin })).data.user;
+  r = await call(`/api/admin/stores/${nomin.id}/admins/${shopUser.id}`, { method: "DELETE", cookie: boss });
+  assert.strictEqual(r.status, 400);
+  await call(`/api/admin/stores/${nomin.id}/admins`, { method: "POST", cookie: boss, body: { email: "cust@my.mn", level: "OWNER" } });
   assert.strictEqual((await call(`/api/admin/stores/${nomin.id}/admins/${shopUser.id}`, { method: "DELETE", cookie: boss })).status, 200);
   assert.strictEqual((await call("/api/admin/stats", { cookie: shopAdmin })).status, 403);
 });
@@ -370,4 +374,99 @@ test("try-on: AI алдаа гарвал эрх буцна, үл мэдэгдэ�
   fail = false;
   const r = await call("/api/tryon", { method: "POST", body: { photo } });
   assert.strictEqual(r.data.result.dun, "todorhoigui");
+});
+
+test("олон админ: OWNER баг удирдана, MANAGER үгүй, нэг админ олон дэлгүүр", async (t) => {
+  mockClaude();
+  const { server, call } = await startServer();
+  t.after(() => { server.closeAllConnections(); server.close(); global.fetch = realFetch; });
+  const reg = (email) => call("/api/auth/register", { method: "POST", body: { email, password: "password1" } }).then((r) => r.cookie);
+  const boss = await reg("boss@my.mn");
+  const owner = await reg("owner@my.mn");
+  const mgr = await reg("mgr@my.mn");
+  const third = await reg("third@my.mn");
+  const mk = (name, slug) => call("/api/admin/stores", { method: "POST", cookie: boss, body: { name, slug } }).then((r) => r.data.store);
+  const a = await mk("Store A", "store-a");
+  const b = await mk("Store B", "store-b");
+  const c = await mk("Store C", "store-c");
+  const add = (id, cookie, email, level) => call(`/api/admin/stores/${id}/admins`, { method: "POST", cookie, body: { email, level } });
+  const userId = async (cookie) => (await call("/api/me", { cookie })).data.user.id;
+
+  // SUPER_ADMIN нэг хүнийг хоёр дэлгүүрийн OWNER болгоно
+  assert.strictEqual((await add(a.id, boss, "owner@my.mn", "OWNER")).status, 200);
+  assert.strictEqual((await add(b.id, boss, "owner@my.mn", "OWNER")).status, 200);
+  assert.strictEqual((await add(a.id, boss, "owner@my.mn", "ADMIN")).status, 400);
+  let me = await call("/api/admin/me", { cookie: owner });
+  assert.deepStrictEqual(me.data.stores.map((s) => [s.slug, s.level]).sort(), [["store-a", "OWNER"], ["store-b", "OWNER"]]);
+
+  // OWNER өөрийн дэлгүүрт MANAGER нэмнэ, өөр дэлгүүрт үгүй
+  assert.strictEqual((await add(a.id, owner, "mgr@my.mn", "MANAGER")).status, 200);
+  assert.strictEqual((await add(c.id, owner, "mgr@my.mn", "MANAGER")).status, 403);
+  assert.strictEqual((await add(a.id, owner, "boss@my.mn", "MANAGER")).status, 400);
+  assert.strictEqual((await add(a.id, owner, "nobody@my.mn", "MANAGER")).status, 404);
+  let admins = (await call(`/api/admin/stores/${a.id}/admins`, { cookie: owner })).data.admins;
+  assert.deepStrictEqual(admins.map((x) => [x.email, x.level]), [["owner@my.mn", "OWNER"], ["mgr@my.mn", "MANAGER"]]);
+
+  // MANAGER: статистик, нэр/өнгө — тийм; баг харах/удирдах, хязгаар — үгүй
+  assert.strictEqual((await call("/api/admin/me", { cookie: mgr })).data.stores[0].level, "MANAGER");
+  assert.strictEqual((await call(`/api/admin/stores/${a.id}/admins`, { cookie: mgr })).status, 403);
+  assert.strictEqual((await add(a.id, mgr, "third@my.mn", "MANAGER")).status, 403);
+  assert.strictEqual((await call(`/api/admin/stores/${a.id}/admins/${await userId(owner)}`, { method: "DELETE", cookie: mgr })).status, 403);
+  let r = await call(`/api/admin/stores/${a.id}`, { method: "PATCH", cookie: mgr, body: { name: "Store A2", dailyCap: 5 } });
+  assert.strictEqual(r.data.store.name, "Store A2");
+  assert.strictEqual(r.data.store.daily_cap, null);
+  assert.strictEqual((await call(`/api/admin/stores/${b.id}`, { method: "PATCH", cookie: mgr, body: { name: "x" } })).status, 403);
+  assert.strictEqual((await call("/api/admin/stats", { cookie: mgr })).status, 200);
+  assert.strictEqual((await call("/api/admin/stores", { cookie: owner })).status, 403); // бүх дэлгүүрийн жагсаалт — SUPER_ADMIN
+
+  // Статистик: OWNER нийлбэр (A+B) эсвэл нэг дэлгүүр; өөр дэлгүүр 403
+  const cust = await reg("cust@my.mn");
+  await call("/api/style", { method: "POST", cookie: cust, headers: { "X-Store": "store-a" }, body: quiz("Ажил") });
+  await call("/api/style", { method: "POST", cookie: cust, headers: { "X-Store": "store-b" }, body: quiz("Болзоо") });
+  await call("/api/style", { method: "POST", cookie: cust, headers: { "X-Store": "store-c" }, body: quiz("Ярилцлага") });
+  assert.strictEqual((await call("/api/admin/stats", { cookie: owner })).data.reports.total, 2);
+  assert.strictEqual((await call("/api/admin/stats?store=" + b.id, { cookie: owner })).data.reports.total, 1);
+  assert.strictEqual((await call("/api/admin/stats?store=" + c.id, { cookie: owner })).status, 403);
+  assert.strictEqual((await call("/api/admin/stats", { cookie: mgr })).data.reports.total, 1);
+
+  // Сүүлийн OWNER: хасахгүй, MANAGER болгохгүй
+  const ownerId = await userId(owner);
+  r = await call(`/api/admin/stores/${a.id}/admins/${ownerId}`, { method: "DELETE", cookie: owner });
+  assert.strictEqual(r.status, 400);
+  assert.strictEqual((await add(a.id, owner, "owner@my.mn", "MANAGER")).status, 400);
+  // MANAGER-ийг OWNER болгосны дараа анхны OWNER өөрийгөө хасаж болно
+  assert.strictEqual((await add(a.id, owner, "mgr@my.mn", "OWNER")).status, 200);
+  assert.strictEqual((await call(`/api/admin/stores/${a.id}/admins/${ownerId}`, { method: "DELETE", cookie: owner })).status, 200);
+  me = await call("/api/admin/me", { cookie: owner });
+  assert.deepStrictEqual(me.data.stores.map((s) => s.slug), ["store-b"]);
+  assert.strictEqual((await call(`/api/admin/stores/${a.id}/admins`, { cookie: owner })).status, 403);
+
+  // Админ биш хэрэглэгч
+  assert.strictEqual((await call("/api/admin/me", { cookie: third })).status, 403);
+  assert.strictEqual((await call("/api/me", { cookie: third })).data.user.role, "USER");
+  // Хэрэглэгчийн тал өөрчлөгдөхгүй: дэлгүүрийн хуудас ажиллана
+  assert.strictEqual((await call("/s/store-a")).status, 200);
+});
+
+test("migration: хуучин STORE_ADMIN + store_id нэг удаа OWNER болно", async () => {
+  const fs = require("fs");
+  const os = require("os");
+  const path = require("path");
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "mystyle-")), "db.json");
+  fs.writeFileSync(file, JSON.stringify({
+    users: [
+      { id: "u1", email: "old@my.mn", pass_hash: "x", role: "STORE_ADMIN", store_id: "s1", created_at: "2026-01-01T00:00:00Z" },
+      { id: "u2", email: "user@my.mn", pass_hash: "x", role: "USER", store_id: null, created_at: "2026-01-01T00:00:00Z" },
+    ],
+    stores: [{ id: "s1", slug: "old", name: "Old", active: true, daily_cap: null, created_at: "2026-01-01T00:00:00Z" }],
+  }));
+  let st = createFileStore(file);
+  assert.deepStrictEqual(await st.listStoreAdmins("s1"), [{ id: "u1", email: "old@my.mn", level: "OWNER" }]);
+  assert.strictEqual((await st.listUserStores("u2")).length, 0);
+  // Хассаны дараа дахин ачаалахад буцаж ирэхгүй (хуулалт нэг удаа)
+  await st.setStoreAdmin("s1", "u2", "OWNER");
+  await st.removeStoreAdmin("s1", "u1");
+  st = createFileStore(file);
+  assert.deepStrictEqual((await st.listStoreAdmins("s1")).map((a) => a.id), ["u2"]);
+  fs.rmSync(path.dirname(file), { recursive: true, force: true });
 });
