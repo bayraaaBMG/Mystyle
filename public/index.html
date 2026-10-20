@@ -37,11 +37,23 @@
   /* Hero preview cards */
   .hcards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:40px 0 0}
   @media(max-width:580px){.hcards{grid-template-columns:repeat(2,1fr)}}
-  .hcard{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:18px 14px;text-align:center;transition:transform .15s,box-shadow .15s}
-  .hcard:hover{transform:translateY(-3px);box-shadow:0 8px 20px -8px rgba(34,31,26,.18)}
+  .hcard{appearance:none;font-family:'Manrope';color:var(--ink);cursor:pointer;width:100%;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:18px 14px;text-align:center;transition:transform .15s,box-shadow .15s,border-color .15s}
+  .hcard:hover,.hcard:focus-visible{transform:translateY(-3px);box-shadow:0 8px 20px -8px rgba(34,31,26,.18);border-color:var(--accent);outline:none}
+  .hcard>span{display:block}
   .hcard .hc-ico{font-size:26px;margin-bottom:10px}
   .hcard .hc-t{font-weight:800;font-size:13px;margin-bottom:5px}
   .hcard .hc-d{font-size:12px;color:var(--muted);line-height:1.4}
+  .hcard .hc-go{font-size:12px;font-weight:800;color:var(--accent-dark);margin-top:8px}
+
+  /* Demo report modal */
+  .m-box.wide{max-width:640px;padding:24px 22px 20px}
+  .demo-who{font-size:12px;color:var(--muted);background:var(--bg);border-radius:10px;padding:8px 12px;margin-bottom:14px}
+  .demo-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+  .demo-tab{appearance:none;font-family:'Manrope';font-size:13px;font-weight:700;border:1.5px solid var(--line);background:#fff;color:var(--ink);border-radius:100px;padding:6px 12px;cursor:pointer}
+  .demo-tab.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+  .demo-body{min-height:200px}
+  .demo-foot{position:sticky;bottom:-20px;background:var(--paper);padding:14px 0 4px;margin-top:16px;border-top:1px solid var(--line);text-align:center}
+  .demo-foot p{font-size:12px;color:var(--muted);margin-top:8px}
 
   /* Pricing */
   .pricing{padding:56px 0 16px}
@@ -320,6 +332,26 @@
   </div>
 </div>
 
+<div class="modal" id="demo-modal" role="dialog" aria-modal="true" aria-labelledby="demo-title">
+  <div class="m-box wide">
+    <button type="button" class="m-close" data-close aria-label="Хаах">✕</button>
+    <h3 id="demo-title">Жишээ тайлан</h3>
+    <p class="m-sub">Бодит тайлан таны хариулт, зурагт тулгуурлан яг ийм бүтэцтэй гарна.</p>
+    <div class="demo-who">Жишээ хэрэглэгч: Эмэгтэй · 165 см · Цаг хэлбэр · Зууван нүүр · Дунд зэргийн арьс, дулаан өнгөлөг · Minimal стиль · Ажил</div>
+    <div class="demo-tabs" id="demo-tabs" role="tablist">
+      <button type="button" class="demo-tab" data-tab="ongo" role="tab">🎨 Өнгө</button>
+      <button type="button" class="demo-tab" data-tab="outfit" role="tab">👗 Outfit</button>
+      <button type="button" class="demo-tab" data-tab="us" role="tab">✂️ Үс</button>
+      <button type="button" class="demo-tab" data-tab="delguur" role="tab">🛍️ Дэлгүүр</button>
+    </div>
+    <div class="demo-body" id="demo-body"></div>
+    <div class="demo-foot">
+      <button type="button" class="generate" id="demo-start">Тест өгөх — өөрийн тайлангаа авах →</button>
+      <p>Үнэгүй · 2–3 минут · Зураг хадгалагдахгүй</p>
+    </div>
+  </div>
+</div>
+
 <section class="hero">
   <div class="wrap">
     <img class="brand-mark" src="/icon.svg" alt="MyStyle лого">
@@ -333,10 +365,10 @@
       <button type="button" class="nf" data-go="wardrobe"><span class="nf-badge">Шинэ</span><div class="nf-ico">🧺</div><div class="nf-t">7 хоногийн хувцасны төлөвлөгөө</div><div class="nf-d">Шүүгээнийхээ 10–20 зургийг оруулаад өдөр бүр юу өмсөхөө мэд.</div><span class="nf-go">Шүүгээгээ оруулах →</span></button>
     </div>
     <div class="hcards">
-      <div class="hcard"><div class="hc-ico">🎨</div><div class="hc-t">Өнгөний palette</div><div class="hc-d">Арьстай тохирох 6 өнгө hex кодтойгоор</div></div>
-      <div class="hcard"><div class="hc-ico">👗</div><div class="hc-t">Outfit санаа</div><div class="hc-d">Нөхцөл бүрт зохих бүрэн хослол</div></div>
-      <div class="hcard"><div class="hc-ico">✂️</div><div class="hc-t">Үсний засалт</div><div class="hc-d">Нүүрний хэлбэрт тохирсон засалт</div></div>
-      <div class="hcard"><div class="hc-ico">🛍️</div><div class="hc-t">Дэлгүүрийн зөвлөмж</div><div class="hc-d">Монгол зах зээлд хаанаас юу авах</div></div>
+      <button type="button" class="hcard" data-demo="ongo"><span class="hc-ico">🎨</span><span class="hc-t">Өнгөний palette</span><span class="hc-d">Арьстай тохирох 6 өнгө hex кодтойгоор</span><span class="hc-go">Жишээ үзэх →</span></button>
+      <button type="button" class="hcard" data-demo="outfit"><span class="hc-ico">👗</span><span class="hc-t">Outfit санаа</span><span class="hc-d">Нөхцөл бүрт зохих бүрэн хослол</span><span class="hc-go">Жишээ үзэх →</span></button>
+      <button type="button" class="hcard" data-demo="us"><span class="hc-ico">✂️</span><span class="hc-t">Үсний засалт</span><span class="hc-d">Нүүрний хэлбэрт тохирсон засалт</span><span class="hc-go">Жишээ үзэх →</span></button>
+      <button type="button" class="hcard" data-demo="delguur"><span class="hc-ico">🛍️</span><span class="hc-t">Дэлгүүрийн зөвлөмж</span><span class="hc-d">Монгол зах зээлд хаанаас юу авах</span><span class="hc-go">Жишээ үзэх →</span></button>
     </div>
   </div>
 </section>
@@ -877,6 +909,70 @@
     $('tresult').style.display='block';
     $('tresult').scrollIntoView({behavior:'smooth',block:'nearest'});
   }
+
+  // ---------- Жишээ тайлан (нүүр хуудасны картууд) — статик өгөгдөл, Claude дуудахгүй ----------
+  const DEMO={
+    ongo_tovch:'Таны дулаан өнгөлөг, дунд зэргийн арьсанд шар, улбар туяатай, зөөлөн гэрэлтэй өнгөнүүд хамгийн их зохино. Хэт хүйтэн цэнхэр, цайвар саарал өнгө нүүрийг ядарсан харагдуулж болох тул нүүрнээс зайдуу хэсэгт өмсөөрэй.',
+    ongo:[
+      {ner:'Тоосгон улаан',hex:'#B5482B',yagaad:'Дулаан өнгөлөгтэй арьсны шаргал туяаг тодруулж, нүүрийг амьд харагдуулна.',ilerhiilel:'Илүү эрч хүчтэй, өөртөө итгэлтэй.',setgegdel:'Шийдэмгий, дулаан хүн гэсэн сэтгэгдэл төрүүлнэ.'},
+      {ner:'Цөцгий',hex:'#F3E7C9',yagaad:'Цагаанаас зөөлөн тул арьстай өрсөлдөхгүй, нүүрний орчимд цэвэрхэн харагдана.',ilerhiilel:'Илүү цэвэрхэн, зөөлөн.',setgegdel:'Тайван, найдвартай.'},
+      {ner:'Чидун ногоон',hex:'#6B6B3A',yagaad:'Дулаан өнгөлөгтэй газрын өнгө тул арьсны өнгөтэй байгалиасаа зохицоно.',ilerhiilel:'Илүү тогтвортой, боловсронгуй.',setgegdel:'Ухаалаг, бодлоготой.'},
+      {ner:'Тэмээн бор',hex:'#B08A5B',yagaad:'Зууван нүүрний зөөлөн шугамтай ижил дулаан аястай.',ilerhiilel:'Илүү дэгжин, тансаг.',setgegdel:'Мэргэжлийн, нягт нямбай.'},
+      {ner:'Тараг шар',hex:'#D9A441',yagaad:'Арьсны алтлаг туяаг гэрэлтүүлж, нүд тод харагдана.',ilerhiilel:'Илүү гэгээлэг, эрч хүчтэй.',setgegdel:'Нээлттэй, найрсаг.'},
+      {ner:'Гүн хөх ногоон',hex:'#1F5C5B',yagaad:'Улбар туяатай арьсанд эсрэг тэнцвэр үүсгэж, хүйтэн өнгө хэрэгтэй үед хамгийн аюулгүй сонголт.',ilerhiilel:'Илүү гүнзгий, сонирхолтой.',setgegdel:'Бүтээлч, өвөрмөц.'}
+    ],
+    outfit:[
+      {nohtsol:'Ажил',tailbar:'Цөцгий өнгийн трикотаж цамц, тэмээн бор өндөр бэлхүүстэй шулуун өмд, тоосгон улаан пальто, бор савхин loafer. Өндөр бэлхүүс таны цаг хэлбэрийн бэлхүүсийг тодотгоно.'},
+      {nohtsol:'Өдөр тутам',tailbar:'Чидун ногоон оверсайз биш, мөрөн дээрээ таарсан хүрэм, цагаан футболк, шулуун jeans, цагаан пүүз. Бэлхүүсэнд нимгэн бүс зүүвэл пропорц тань илүү тод харагдана.'},
+      {nohtsol:'Болзоо',tailbar:'Гүн хөх ногоон wrap даашинз (өвдөг орчим урттай), алтлаг жижиг ээмэг, нүцгэн өнгийн өндөр биш өсгийтэй гутал. Wrap загвар бэлхүүсийг байгалиас нь онцолно.'}
+    ],
+    us:[
+      'Зууван нүүр олон засалтад зохидог тул эрүүнээс мөр хүртэлх урттай, үзүүрээ давхаргатай засалт таны нүүрний зөөлөн шугамыг онцолно.',
+      'Хажуу тийш сэрвээтэй (side-swept) хялгас хацрын ясыг тодруулж, ажлын орчинд цэвэрхэн харагдана.',
+      'Дулаан өнгөлөгт карамель эсвэл зөгийн балан highlight зохино — хүйтэн үнсэн шар өнгөнөөс зайлсхийвэл арьс гэгээлэг харагдана.'
+    ],
+    delguur:[
+      {ner:'Номин их дэлгүүр',turul:'Ажлын шулуун өмд, трикотаж цамц зэрэг үндсэн хувцас. Размераа өмсөж туршаад авахад тохиромжтой.'},
+      {ner:'Улсын их дэлгүүр',turul:'Пальто, савхин гутал гэх мэт удаан эдэлгээтэй гадуур хувцас, брэндийн сонголт ихтэй.'},
+      {ner:'Нарантуул зах',turul:'Бүс, ороолт, ээмэг зэрэг аксессуар, өнгөний туршилт хийхэд хямд сонголт.'}
+    ],
+    shopping:[
+      {zuil:'Тэмээн бор өндөр бэлхүүстэй өмд',yagaad:'Таны palette-д багтдаг, ихэнх цамцтай хослоно.'},
+      {zuil:'Нимгэн савхин бүс',yagaad:'Цаг хэлбэрийн бэлхүүсийг тодотгох хамгийн хялбар арга.'}
+    ]
+  };
+  function demoHtml(tab){
+    const d=DEMO;
+    if(tab==='ongo') return '<p class="ongo-tovch">'+esc(d.ongo_tovch)+'</p>'+
+      '<div class="palette">'+d.ongo.map(c=>'<div class="sw"><div class="chip" style="background:'+hex(c.hex)+'"></div><div class="nm">'+esc(c.ner)+'<br>'+esc(c.hex)+'</div></div>').join('')+'</div>'+
+      '<div class="r-sub" style="margin-top:20px">Өнгө бүр танд юу өгөх вэ</div>'+
+      d.ongo.map(c=>'<div class="cdetail"><div class="cd-chip" style="background:'+hex(c.hex)+'"></div><div>'+
+        '<div class="cd-name">'+esc(c.ner)+'<span>'+esc(c.hex)+'</span></div>'+
+        '<p><b>Яагаад</b>'+esc(c.yagaad)+'</p><p><b>Харагдах байдал</b>'+esc(c.ilerhiilel)+'</p><p><b>Сэтгэгдэл</b>'+esc(c.setgegdel)+'</p>'+
+      '</div></div>').join('');
+    if(tab==='outfit') return d.outfit.map(o=>oCard(o.nohtsol,o.tailbar)).join('')+
+      '<p class="size-note">🧺 Шүүгээнийхээ 10–20 зургийг оруулбал зөвхөн өөрийн хувцаснаас 7 хоногийн өдөр бүрийн хослол гаргана.</p>';
+    if(tab==='us') return '<div class="r-sub">Зууван нүүрэнд тохирох засалт</div>'+liList(d.us)+
+      '<p class="size-note">📷 Selfie оруулбал AI нүүрний хэлбэрийг өөрөө тодорхойлно.</p>';
+    return '<div class="r-sub">Хаанаас юу авах</div>'+d.delguur.map(x=>oCard(x.ner,x.turul)).join('')+
+      '<div class="r-sub" style="margin-top:18px">Худалдан авалтын санал</div>'+d.shopping.map(x=>oCard(x.zuil,x.yagaad)).join('');
+  }
+  function showDemoTab(tab){
+    document.querySelectorAll('#demo-tabs .demo-tab').forEach(b=>{ const on=b.dataset.tab===tab; b.classList.toggle('on',on); b.setAttribute('aria-selected',on); });
+    $('demo-body').innerHTML=demoHtml(tab);
+    $('demo-modal').querySelector('.m-box').scrollTop=0;
+  }
+  function openDemo(tab){ showDemoTab(tab); openModal('demo-modal'); track('demo_open'); }
+  document.querySelectorAll('.hcard[data-demo]').forEach(c=>c.addEventListener('click',()=>openDemo(c.dataset.demo)));
+  $('demo-tabs').addEventListener('click',e=>{ const b=e.target.closest('.demo-tab'); if(b) showDemoTab(b.dataset.tab); });
+  $('demo-start').addEventListener('click',()=>{
+    closeModal('demo-modal');
+    $('result').style.display='none'; $('quiz').style.display='block';
+    $('quiz').scrollIntoView({behavior:'smooth'});
+  });
+  // Шууд холбоос: /#demo-ongo, /#demo-outfit, /#demo-us, /#demo-delguur
+  const dm=location.hash.match(/^#demo-(ongo|outfit|us|delguur)$/);
+  if(dm) openDemo(dm[1]);
 
   document.getElementById('gen').addEventListener('click',generate);
   document.getElementById('again').addEventListener('click',()=>{
