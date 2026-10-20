@@ -47,7 +47,7 @@ const SUPER_ADMIN_EMAILS = new Set(
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
-const TRACKABLE = new Set(["premium_click", "pdf_click", "again_click", "report_view", "pricing_click", "app_installed", "demo_open"]);
+const TRACKABLE = new Set(["premium_click", "pdf_click", "again_click", "report_view", "pricing_click", "app_installed", "demo_open", "install_click"]);
 
 function createApp(store = createStore()) {
   const app = express();

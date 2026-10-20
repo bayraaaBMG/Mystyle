@@ -154,8 +154,14 @@ DB хүснэгтүүд (`stores`, `store_admins`, `role`, `store_id` баган
 
 ## 7. PWA (апп шиг суулгах)
 
-- `manifest.json`, `sw.js`, icon-ууд (`icon-192.png`, `icon-512.png`, maskable, `apple-touch-icon.png`)
-- Android/Chrome: «📲 Суулгах» товч гарна. iPhone: Safari → Хуваалцах → «Add to Home Screen»
+- `manifest.json` (`id`, `start_url`, `scope`, `display: standalone`, theme/background өнгө, icon 192/512/maskable, Android-ийн суулгах цонхны `screenshots/`), `sw.js`, `apple-touch-icon.png`
+- «📲 Апп татах»: нүүр хуудасны блок + дээд мөрийн товч. Browser тус бүрд:
+  - Chrome / Edge / Samsung Internet (Android, desktop) — `beforeinstallprompt`-ийг барьж өөрийн товчоор системийн суулгах цонхыг гаргана
+  - iPhone/iPad (бүх browser) — «Хуваалцах → Нүүр дэлгэцэд нэмэх» 3 алхмын заавар
+  - Facebook / Instagram доторх browser — суулгах боломжгүй тул «Safari/Browser-т нээх» заавар
+  - Суулгасны дараа «✓ Суулгасан»; апп дотроос (standalone) нээгдсэн үед товч харагдахгүй
+- Шалгах: Chrome DevTools → Application → Manifest («Installability» алдаагүй байх). Lighthouse 12-оос PWA ангилал хасагдсан.
+- Өөрчлөлтийн дараа `sw.js`-ийн `VERSION`-ийг нэмэгдүүлбэл хуучин cache цэвэрлэгдэнэ.
 - Дэлгүүрийн хуудаснаас суулгавал апп тухайн дэлгүүрийн нэрээр, тухайн хуудсаараа нээгдэнэ (`/s/<slug>/manifest.json`)
 - Service worker зөвхөн хуудас, icon-уудыг cache хийнэ. `/api/*` (тайлан, хувийн мэдээлэл, зураг) **хэзээ ч cache хийгдэхгүй**
 - PWA зөвхөн HTTPS дээр ажиллана (Vercel автоматаар HTTPS). Локалд `localhost` дээр ажиллана.

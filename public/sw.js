@@ -1,8 +1,8 @@
 // MyStyle service worker — апп шиг суулгах, интернэт тасарсан үед хуудсыг нээх.
 // /api/* хүсэлтийг хэзээ ч cache хийхгүй (хувийн мэдээлэл, тайлан, зураг).
 
-const VERSION = "mystyle-v2";
-const SHELL = ["/", "/privacy.html", "/icon.svg", "/icon-192.png", "/manifest.json"];
+const VERSION = "mystyle-v3";
+const SHELL = ["/", "/privacy.html", "/icon.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png", "/manifest.json"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -26,8 +26,11 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(VERSION).then((c) => c.put(req, copy));
+          // Зөвхөн амжилттай хуудсыг хадгална — 404/500 хуудас offline үед гарч ирэхээс сэргийлнэ
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(VERSION).then((c) => c.put(req, copy));
+          }
           return res;
         })
         .catch(() => caches.match(req).then((r) => r || caches.match("/")))

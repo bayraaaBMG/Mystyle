@@ -9,6 +9,8 @@
 <meta name="theme-color" content="#221F1A">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="MyStyle">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Spectral:ital,wght@0,600;0,800;1,600;1,800&display=swap" rel="stylesheet">
@@ -44,6 +46,22 @@
   .hcard .hc-t{font-weight:800;font-size:13px;margin-bottom:5px}
   .hcard .hc-d{font-size:12px;color:var(--muted);line-height:1.4}
   .hcard .hc-go{font-size:12px;font-weight:800;color:var(--accent-dark);margin-top:8px}
+
+  /* Апп суулгах */
+  .install-band{display:none;align-items:center;gap:14px;text-align:left;margin:22px 0 0;background:var(--ink);color:var(--paper);border-radius:18px;padding:16px 18px}
+  .install-band.show{display:flex}
+  .install-band .ib-ico{flex:none;width:44px;height:44px;border-radius:11px;background:#fff url(/icon-192.png) center/cover}
+  .install-band .ib-t{font-weight:800;font-size:15px}
+  .install-band .ib-d{font-size:12.5px;opacity:.75;line-height:1.4}
+  .install-band .ib-txt{flex:1;min-width:0}
+  .install-band .ib-btn{appearance:none;flex:none;border:none;cursor:pointer;background:var(--paper);color:var(--ink);font-family:'Manrope';font-weight:800;font-size:14px;padding:10px 16px;border-radius:100px}
+  .install-band .ib-btn:disabled{opacity:.7;cursor:default}
+  @media(max-width:420px){.install-band{flex-wrap:wrap}.install-band .ib-btn{width:100%}}
+  .steps{list-style:none;counter-reset:st;margin:6px 0 4px}
+  .steps li{counter-increment:st;position:relative;padding:10px 0 10px 40px;border-bottom:1px solid var(--line);font-size:14px;line-height:1.45}
+  .steps li:last-child{border-bottom:none}
+  .steps li::before{content:counter(st);position:absolute;left:0;top:9px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--paper);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
+  .steps .k{display:inline-block;border:1px solid var(--line);background:#fff;border-radius:6px;padding:0 6px;font-weight:700;white-space:nowrap}
 
   /* Demo report modal */
   .m-box.wide{max-width:640px;padding:24px 22px 20px}
@@ -298,7 +316,7 @@
 <body>
 
 <div class="topbar" id="topbar">
-  <button type="button" class="tb-link" id="install" style="display:none" title="Апп болгон суулгах">📲 Суулгах</button>
+  <button type="button" class="tb-link" id="install" style="display:none" title="Нүүр дэлгэцэд суулгах">📲 Апп татах</button>
   <a class="tb-link" id="admin-link" href="/admin.html" style="display:none">Админ</a>
   <span class="who" id="who"></span>
   <button type="button" class="tb-btn" id="myreports" style="display:none">Миний тайлангууд</button>
@@ -332,6 +350,15 @@
   </div>
 </div>
 
+<div class="modal" id="install-modal" role="dialog" aria-modal="true" aria-labelledby="inst-title">
+  <div class="m-box">
+    <button type="button" class="m-close" data-close aria-label="Хаах">✕</button>
+    <h3 id="inst-title">Нүүр дэлгэцэд нэмэх</h3>
+    <p class="m-sub" id="inst-sub"></p>
+    <ol class="steps" id="inst-steps"></ol>
+  </div>
+</div>
+
 <div class="modal" id="demo-modal" role="dialog" aria-modal="true" aria-labelledby="demo-title">
   <div class="m-box wide">
     <button type="button" class="m-close" data-close aria-label="Хаах">✕</button>
@@ -360,6 +387,11 @@
     <p class="lede">Хэдхэн асуултад хариулаад, биеийн онцлогт тань тохирсон хувийн стилийн зөвлөгөөг минутын дотор аваарай.</p>
     <button type="button" class="cta" id="start">Үнэгүй тестээ эхлүүлэх</button>
     <div class="demo-tag">AI таны хариултад тулгуурлан зөвлөгөө гаргана</div>
+    <div class="install-band" id="install-band">
+      <span class="ib-ico" aria-hidden="true"></span>
+      <span class="ib-txt"><span class="ib-t" id="ib-t">MyStyle-ийг апп болгон суулгах</span><br><span class="ib-d" id="ib-d">Нүүр дэлгэцээсээ шууд нээнэ — татах зай бараг эзлэхгүй.</span></span>
+      <button type="button" class="ib-btn" id="ib-btn">📲 Апп татах</button>
+    </div>
     <div class="newfeat">
       <button type="button" class="nf" data-go="tryon"><span class="nf-badge">Шинэ</span><div class="nf-ico">📸</div><div class="nf-t">Дэлгүүрт туршиж байна уу?</div><div class="nf-d">Өмсөж буй зургаа оруулаад танд тохирох эсэх, юуг өөрчлөхийг шууд мэд.</div><span class="nf-go">Зургаа шалгуулах →</span></button>
       <button type="button" class="nf" data-go="wardrobe"><span class="nf-badge">Шинэ</span><div class="nf-ico">🧺</div><div class="nf-t">7 хоногийн хувцасны төлөвлөгөө</div><div class="nf-d">Шүүгээнийхээ 10–20 зургийг оруулаад өдөр бүр юу өмсөхөө мэд.</div><span class="nf-go">Шүүгээгээ оруулах →</span></button>
@@ -810,18 +842,72 @@
     }).catch(()=>{});
   }
 
-  // PWA: service worker + суулгах товч
+  // ---------- PWA: service worker + «Апп татах» ----------
+  // Chrome/Edge/Samsung Internet (Android, desktop): beforeinstallprompt → өөрсдийн товчоор prompt гаргана.
+  // iOS (бүх browser): beforeinstallprompt байхгүй → «Хуваалцах → Нүүр дэлгэцэд нэмэх» заавар.
+  // Facebook/Instagram доторх browser суулгаж чадахгүй → гадна browser-т нээх заавар.
   if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(e=>console.warn('SW',e));
+  const UA=navigator.userAgent;
+  const isIos=/iphone|ipad|ipod/i.test(UA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const inApp=/FBAN|FBAV|FB_IAB|Instagram|Line\/|KAKAOTALK|Messenger/i.test(UA);
+  const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
+  const lsSet=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
   let installEvt=null;
-  window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installEvt=e; $('install').style.display=''; });
-  window.addEventListener('appinstalled',()=>{ $('install').style.display='none'; track('app_installed'); });
-  const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);
-  const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone;
-  if(isIos&&!standalone) $('install').style.display='';
-  $('install').addEventListener('click',async()=>{
-    if(installEvt){ installEvt.prompt(); await installEvt.userChoice; installEvt=null; $('install').style.display='none'; }
-    else if(isIos) alert('iPhone дээр: Safari-ийн доод хэсгийн «Хуваалцах» (⬆️) товчийг дараад «Add to Home Screen» / «Нүүр дэлгэцэнд нэмэх»-ийг сонгоно уу.');
-  });
+
+  function installState(){
+    if(standalone) return 'running';                 // апп дотроос нээгдсэн — товч хэрэггүй
+    if(installEvt) return 'prompt';
+    if(lsGet('pwaInstalled')==='1') return 'installed';
+    if(inApp) return 'inapp';
+    if(isIos) return 'ios';
+    return 'none';                                   // Firefox desktop гэх мэт — суулгах боломжгүй
+  }
+  function renderInstall(){
+    const st=installState(), band=$('install-band'), btn=$('ib-btn'), top=$('install');
+    const show=st==='prompt'||st==='ios'||st==='inapp'||st==='installed';
+    band.classList.toggle('show',show);
+    top.style.display=(st==='prompt'||st==='ios'||st==='inapp')?'':'none';
+    btn.disabled=st==='installed';
+    btn.textContent=st==='installed'?'✓ Суулгасан':st==='inapp'?'Яаж суулгах вэ?':'📲 Апп татах';
+    $('ib-t').textContent=st==='installed'?'MyStyle таны утсанд суусан байна':'MyStyle-ийг апп болгон суулгах';
+    $('ib-d').textContent=st==='installed'?'Нүүр дэлгэц дээрх MyStyle icon-оор нээгээрэй.'
+      :st==='inapp'?'Энэ апп доторх browser-оос суулгах боломжгүй — Safari/Chrome-оор нээнэ.'
+      :'Нүүр дэлгэцээсээ шууд нээнэ — татах зай бараг эзлэхгүй.';
+  }
+  function showInstallHelp(kind){
+    const share='<span class="k">⬆️ Хуваалцах</span>';
+    if(kind==='inapp'){
+      $('inst-sub').textContent='Facebook, Instagram доторх browser апп суулгах боломжгүй. Эхлээд жинхэнэ browser-оор нээнэ үү:';
+      $('inst-steps').innerHTML=
+        '<li>Баруун дээд (эсвэл доод) булангийн <span class="k">⋯</span> цэсийг дарна.</li>'+
+        '<li><span class="k">'+(isIos?'Safari-д нээх':'Browser-т нээх')+'</span>-ийг сонгоно.</li>'+
+        '<li>Нээгдсэн хуудсан дээрх <span class="k">📲 Апп татах</span> товчийг дарна.</li>';
+    }else{
+      $('inst-sub').textContent='iPhone/iPad дээр 3 алхмаар суулгана:';
+      $('inst-steps').innerHTML=
+        '<li>Доод (iPad дээр дээд) мөрийн '+share+' товчийг дарна.</li>'+
+        '<li>Жагсаалтаас <span class="k">Нүүр дэлгэцэд нэмэх</span> (Add to Home Screen)-ийг сонгоно. Харагдахгүй бол доош гүйлгэнэ.</li>'+
+        '<li>Баруун дээд <span class="k">Нэмэх</span> (Add)-ийг дарна — MyStyle icon нүүр дэлгэцэд гарна.</li>';
+    }
+    openModal('install-modal');
+  }
+  async function doInstall(){
+    const st=installState();
+    track('install_click');
+    if(st==='prompt'){
+      const evt=installEvt; installEvt=null;
+      evt.prompt();
+      const choice=await evt.userChoice.catch(()=>null);
+      if(choice&&choice.outcome==='accepted') lsSet('pwaInstalled','1');
+      renderInstall();
+    }else if(st==='ios'||st==='inapp') showInstallHelp(st);
+  }
+  window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installEvt=e; renderInstall(); });
+  window.addEventListener('appinstalled',()=>{ installEvt=null; lsSet('pwaInstalled','1'); renderInstall(); track('app_installed'); });
+  $('install').addEventListener('click',doInstall);
+  $('ib-btn').addEventListener('click',doInstall);
+  renderInstall();
 
   // ---------- Дэлгүүрт туршиж буй зураг ----------
   let tPhoto=null;
