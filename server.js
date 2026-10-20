@@ -11,7 +11,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const auth = require("./lib/auth");
 const limits = require("./lib/limits");
-const { createStore } = require("./lib/store");
+const { createStoreOrUnavailable } = require("./lib/store");
 const { buildContent, storableInput, buildTryonContent, TRYON_VERDICTS } = require("./lib/prompt");
 
 const API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -49,7 +49,7 @@ const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 const TRACKABLE = new Set(["premium_click", "pdf_click", "again_click", "report_view", "pricing_click", "app_installed", "demo_open", "install_click"]);
 
-function createApp(store = createStore()) {
+function createApp(store = createStoreOrUnavailable()) {
   const app = express();
   // Vercel/Render proxy-ийн ард бодит IP-г X-Forwarded-For-оос авна
   app.set("trust proxy", process.env.VERCEL === "1" || process.env.TRUST_PROXY === "1");
@@ -60,10 +60,22 @@ function createApp(store = createStore()) {
   const BASE_MANIFEST = JSON.parse(fs.readFileSync(path.join(__dirname, "public", "manifest.json"), "utf8"));
 
   const ipHash = (req) => auth.hashIp(req.ip);
-  const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
+  const wrap = (fn) => (req, res) => Promise.resolve().then(() => fn(req, res)).catch((err) => {
     console.error(err);
+    // DATABASE_URL / SESSION_SECRET дутуу — функцийг унагахгүй, ойлгомжтой 503 буцаана
+    if (err && err.code === "NOT_CONFIGURED") {
+      return res.status(503).json({ error: "Үйлчилгээ түр ажиллахгүй байна (серверийн тохиргоо дутуу).", code: "not_configured" });
+    }
     res.status(500).json({ error: "Серверийн алдаа. Дахин оролдоно уу." });
   });
+
+  // Тохиргооны шалгалт (deploy-ийн дараа). Нууц утга буцаахгүй, зөвхөн байгаа эсэх.
+  app.get("/api/health", wrap(async (req, res) => {
+    let db = false;
+    try { await store.getUsage("health"); db = true; } catch (e) { /* алга эсвэл холбогдохгүй */ }
+    const ok = db && auth.hasSecret() && !!API_KEY;
+    res.status(ok ? 200 : 503).json({ ok, db, sessionSecret: auth.hasSecret(), anthropicKey: !!API_KEY, model: MODEL });
+  }));
 
   async function currentUser(req) {
     const id = auth.userIdFromRequest(req);

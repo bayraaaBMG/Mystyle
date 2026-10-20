@@ -69,7 +69,7 @@ Neon дээр **Pooled connection** string ашигла (host дотор `-poole
 `vercel.json` функцийн хугацааг 60 секунд (`maxDuration`), `public/` файлуудыг багцад (`includeFiles`) оруулна.
 Vercel дээр `CLAUDE_TIMEOUT_MS=55000` тавь — функц таслагдахаас өмнө Claude хүлээлт зогсож, хэрэглэгчид ойлгомжтой алдаа харагдаж, эрх нь буцна.
 
-Deploy хийсний дараа шалгах:
+Deploy хийсний дараа шалгах (`/api/health` нь DB, SESSION_SECRET, ANTHROPIC_API_KEY байгаа эсэхийг харуулна — тохиргоо дутуу бол хуудас нээгдэх ч API 503 буцаана):
 ```bash
 node scripts/smoke.js https://<домэйн>            # хуудас, PWA, DB холболт
 node scripts/smoke.js https://<домэйн> --write    # + түр хэрэглэгч бүртгээд устгана

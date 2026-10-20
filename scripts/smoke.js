@@ -67,6 +67,12 @@ const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
     const [p, a] = await Promise.all([req("/privacy.html"), req("/admin.html")]);
     expect(p.status === 200 && a.status === 200, `privacy ${p.status}, admin ${a.status}`);
   });
+  await check("Тохиргоо (/api/health)", async () => {
+    const r = await req("/api/health");
+    const j = r.json || {};
+    expect(r.status === 200, `status ${r.status} — db:${j.db} sessionSecret:${j.sessionSecret} anthropicKey:${j.anthropicKey}`);
+    return `model ${j.model}`;
+  });
   await check("DB холболт (/api/me)", async () => {
     const r = await req("/api/me");
     expect(r.status === 200 && r.json && r.json.quota, `status ${r.status} ${r.text.slice(0, 120)}`);

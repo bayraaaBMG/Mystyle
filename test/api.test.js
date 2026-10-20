@@ -470,3 +470,33 @@ test("migration: хуучин STORE_ADMIN + store_id нэг удаа OWNER бо�
   assert.deepStrictEqual((await st.listStoreAdmins("s1")).map((a) => a.id), ["u2"]);
   fs.rmSync(path.dirname(file), { recursive: true, force: true });
 });
+
+test("Vercel дээр DATABASE_URL/SESSION_SECRET дутуу: хуудас, PWA ажиллана, API 503", async () => {
+  const { spawn } = require("child_process");
+  const path = require("path");
+  const env = { ...process.env, VERCEL: "1" };
+  delete env.DATABASE_URL; delete env.SESSION_SECRET; delete env.TEST_DATABASE_URL;
+  const code = `const app=require(${JSON.stringify(path.join(__dirname, "..", "server"))});const s=app.listen(0,()=>console.log("PORT="+s.address().port));`;
+  const child = spawn(process.execPath, ["-e", code], { env, cwd: path.join(__dirname, "..") });
+  try {
+    const port = await new Promise((resolve, reject) => {
+      let out = "";
+      child.stdout.on("data", (d) => { out += d; const m = out.match(/PORT=(\d+)/); if (m) resolve(m[1]); });
+      child.on("exit", (c) => reject(new Error("server exited " + c)));
+    });
+    const get = (p, opts) => realFetch(`http://127.0.0.1:${port}${p}`, opts);
+    for (const p of ["/", "/manifest.json", "/sw.js", "/icon-192.png", "/privacy.html"]) {
+      assert.strictEqual((await get(p)).status, 200, p);
+    }
+    let r = await get("/api/me");
+    assert.strictEqual(r.status, 503);
+    assert.strictEqual((await r.json()).code, "not_configured");
+    r = await get("/api/me", { headers: { Cookie: "ms_session=u1.9999999999.sig" } });
+    assert.strictEqual(r.status, 503);
+    r = await get("/api/health");
+    assert.strictEqual(r.status, 503);
+    assert.deepStrictEqual(await r.json().then((j) => [j.db, j.sessionSecret]), [false, false]);
+  } finally {
+    child.kill();
+  }
+});
